@@ -9,7 +9,7 @@ import {
   Alert,
   ActivityIndicator
 } from 'react-native';
-import { db } from '../../firebase';
+import { db } from '../config/firebase';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { showAlert } from '../utils/alerts';
@@ -65,23 +65,26 @@ export const AddPatientModal = ({ visible, onClose, onAdd }: AddPatientModalProp
         condition,
         therapistId: user?.id,
         isAppUser: false,
+        status: 'pending',
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
 
-      // Create invitation message
-      await addDoc(collection(db, 'messages'), {
-        type: 'invite',
-        title: 'New Therapist Invitation',
-        content: `${user?.name || 'A therapist'} has invited you to join their patient list.`,
-        recipientId: email, // We'll use email as the recipientId for now
-        senderId: user?.id,
-        timestamp: Timestamp.now(),
+      // Create notification for the patient (they'll see this when they join)
+      await addDoc(collection(db, 'notifications'), {
+        type: 'patient_invite',
+        fromUserId: user?.id,
+        fromUserEmail: user?.email,
+        fromUserName: user?.name,
+        toEmail: email, // Use email as identifier for non-app users
+        message: `${user?.name || 'A therapist'} has added you as a patient. Please join the app to start your rehabilitation journey.`,
+        createdAt: Timestamp.now(),
         read: false,
         data: {
           patientId: patientRef.id,
           therapistId: user?.id,
           therapistName: user?.name,
+          therapistEmail: user?.email,
         },
       });
 

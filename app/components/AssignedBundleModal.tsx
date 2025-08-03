@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, StyleSheet, ScrollView, Pressable, Alert, TouchableOpacity } from 'react-native';
-import { db } from '../../firebase';
+import { db } from '../config/firebase';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { isSameDay, addDays } from 'date-fns';
 import { showAlert } from '../utils/alerts';

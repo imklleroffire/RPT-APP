@@ -1,5 +1,8 @@
 import { Timestamp, FieldValue } from 'firebase/firestore';
 
+export type FirebaseTimestamp = Timestamp;
+export type FirebaseFieldValue = FieldValue;
+
 export interface BaseExercise {
   name: string;
   description: string;

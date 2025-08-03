@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "318663061712",
+    "project_id": "rpt-appdemo2",
+    "storage_bucket": "rpt-appdemo2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:318663061712:android:175c675b3cca737d0aeed5",
+        "android_client_info": {
+          "package_name": "com.rptapp.rptapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "318663061712-175c675b3cca737d0aeed5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_pqbcjziruYYqYU_LyisJPn53xlcS9Co"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "318663061712-175c675b3cca737d0aeed5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+} 

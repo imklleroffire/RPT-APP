@@ -1,23 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
-import {
-  User as FirebaseUser,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  deleteUser,
-  sendEmailVerification,
-  Auth,
-} from 'firebase/auth';
-import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  serverTimestamp,
-  Firestore,
-} from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendEmailVerification } from 'firebase/auth';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface User {
   id: string;
@@ -48,11 +33,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(true);
   const [isPendingVerification, setIsPendingVerification] = useState(false);
-  const [authStateListener, setAuthStateListener] = useState<(() => void) | null>(null);
 
   // Function to clear all auth state
   const clearAuthState = useCallback(() => {
@@ -62,66 +46,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
-  // Function to initialize auth state listener
-  const initializeAuthListener = useCallback(() => {
-    if (authStateListener) {
-      authStateListener();
+  // Setup auth state listener
+  useEffect(() => {
+    let unsub: (() => void) | null = null;
+
+    async function start() {
+      try {
+        console.log('[AUTH] Setting up auth state listener...');
+        
+        // Setup auth state listener using Firebase Web SDK
+        unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+          try {
+            if (firebaseUser) {
+              // Only check email verification for newly created accounts
+              if (!firebaseUser.emailVerified && isPendingVerification) {
+                setUser(null);
+                return;
+              }
+              const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+              if (userDoc.exists()) {
+                const userData = userDoc.data();
+                setUser({
+                  id: firebaseUser.uid,
+                  uid: firebaseUser.uid,
+                  name: userData?.name || '',
+                  displayName: firebaseUser.displayName || undefined,
+                  email: userData?.email || firebaseUser.email || '',
+                  emailVerified: firebaseUser.emailVerified,
+                  role: userData?.role || 'patient',
+                  therapistId: userData?.therapistId,
+                  createdAt: userData?.createdAt?.toDate?.() || new Date(),
+                  updatedAt: userData?.updatedAt?.toDate?.() || new Date(),
+                });
+              } else {
+                await signOut(auth);
+                setUser(null);
+              }
+            } else {
+              setUser(null);
+            }
+          } catch (error) {
+            console.error('[AUTH] Error in auth state change:', error);
+            setUser(null);
+          }
+        });
+
+      } catch (error) {
+        console.error('[AUTH] Error setting up auth listener:', error);
+      }
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (firebaseUser) {
-          // Only check email verification for newly created accounts
-          if (!firebaseUser.emailVerified && isPendingVerification) {
-            clearAuthState();
-            setIsInitialized(true);
-            return;
-          }
+    start();
 
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setUser({
-              id: firebaseUser.uid,
-              uid: firebaseUser.uid,
-              name: userData.name,
-              displayName: firebaseUser.displayName || undefined,
-              email: userData.email,
-              emailVerified: firebaseUser.emailVerified,
-              role: userData.role,
-              therapistId: userData.therapistId,
-              createdAt: userData.createdAt?.toDate?.() || new Date(),
-              updatedAt: userData.updatedAt?.toDate?.() || new Date(),
-            });
-          } else {
-            await firebaseSignOut(auth);
-            clearAuthState();
-          }
-        } else {
-          clearAuthState();
-        }
-      } catch (error) {
-        console.error('Error in auth state change handler:', error);
-        clearAuthState();
-      } finally {
-        setIsInitialized(true);
-      }
-    });
-
-    setAuthStateListener(() => unsubscribe);
-    return unsubscribe;
-  }, [clearAuthState, isPendingVerification]);
-
-  // Initialize auth listener on mount
-  useEffect(() => {
-    const unsubscribe = initializeAuthListener();
     return () => {
-      unsubscribe();
-      if (authStateListener) {
-        authStateListener();
-      }
+      if (unsub) unsub();
     };
-  }, [initializeAuthListener]);
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -130,7 +110,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
       console.error('Sign in error:', error);
-      setError(error instanceof Error ? error.message : 'Failed to sign in');
+      if (error instanceof Error) {
+        if (error.message.includes('auth/user-not-found')) {
+          setError('No account found with this email address.');
+        } else if (error.message.includes('auth/wrong-password')) {
+          setError('Incorrect password. Please try again.');
+        } else if (error.message.includes('auth/invalid-email')) {
+          setError('Please enter a valid email address.');
+        } else if (error.message.includes('auth/too-many-requests')) {
+          setError('Too many failed attempts. Please try again later.');
+        } else {
+          setError('Failed to sign in. Please check your credentials.');
+        }
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -143,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const { user: firebaseUser } = userCredential;
+      const firebaseUser = userCredential.user;
       
       if (!firebaseUser) {
         throw new Error('Failed to create user account');
@@ -170,8 +164,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error instanceof Error) {
         if (error.message.includes('auth/email-already-in-use')) {
           setError('This email is already registered. Please use a different email or sign in.');
-        } else if (error.message.includes('auth/invalid-email')) {
-          setError('Please enter a valid email address.');
         } else if (error.message.includes('auth/weak-password')) {
           setError('Password should be at least 6 characters long.');
         } else {
@@ -189,21 +181,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       setLoading(true);
-      setError(null);
-      
-      // Clear local state first
+      await signOut(auth);
       clearAuthState();
-      
-      // Then sign out from Firebase
-      await firebaseSignOut(auth);
-      
-      // Force reinitialize auth listener
-      initializeAuthListener();
-      
     } catch (error) {
       console.error('Sign out error:', error);
-      setError(error instanceof Error ? error.message : 'Failed to sign out');
-      clearAuthState();
+      setError('Failed to sign out. Please try again.');
       throw error;
     } finally {
       setLoading(false);
@@ -211,15 +193,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteAccount = async () => {
-    if (!auth.currentUser) return;
     try {
       setLoading(true);
-      setError(null);
-      await deleteUser(auth.currentUser);
-      clearAuthState();
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await deleteDoc(doc(db, 'users', currentUser.uid));
+        await currentUser.delete();
+        clearAuthState();
+      }
     } catch (error) {
       console.error('Delete account error:', error);
-      setError(error instanceof Error ? error.message : 'Failed to delete account');
+      setError('Failed to delete account. Please try again.');
       throw error;
     } finally {
       setLoading(false);
@@ -230,36 +214,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsPendingVerification(pending);
   };
 
-  if (!isInitialized || loading) {
+  const value: AuthContextType = {
+    user,
+    loading,
+    error,
+    signIn,
+    signUp,
+    signOut,
+    deleteAccount,
+    setPendingVerification,
+    isPendingVerification,
+  };
+
+  if (!isInitialized) {
     return (
-      <View 
-        style={{ 
-          flex: 1, 
-          justifyContent: 'center', 
-          alignItems: 'center',
-          backgroundColor: '#fff'
-        }}
-        pointerEvents="none"
-      >
-        <ActivityIndicator size="large" color="#0000ff" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+        <Text>Initializing...</Text>
       </View>
     );
   }
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        error,
-        signIn,
-        signUp,
-        signOut,
-        deleteAccount,
-        setPendingVerification,
-        isPendingVerification,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -271,6 +248,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
-
-export default AuthProvider; 
+} 

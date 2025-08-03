@@ -9,6 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "platforms": ["ios", "android", "web"],
+    "sdkVersion": "53.0.0",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.rptapp.rptapp"
@@ -17,14 +18,14 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.rptapp.rptapp"
     },
     "web": {
       "bundler": "metro"
     },
     "plugins": [
       "expo-router",
-      "@react-native-firebase/app",
       [
         "expo-splash-screen",
         {

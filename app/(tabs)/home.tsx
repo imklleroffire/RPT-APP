@@ -4,10 +4,11 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { db } from '../config/firebase';
 import { FONTS, SPACING, BORDER_RADIUS } from '../constants/theme';
 import ClinicDetailsModal from '../components/ClinicDetailsModal';
 
@@ -30,6 +31,7 @@ export default function TherapistHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
+  const { unreadCount } = useNotifications();
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [stats, setStats] = useState<Stats>({
     totalPatients: 0,
@@ -135,6 +137,13 @@ export default function TherapistHomeScreen() {
           onPress={() => router.push('/notifications')}
         >
           <Ionicons name="notifications" size={24} color={colors.primary} />
+          {unreadCount > 0 && (
+            <View style={[styles.notificationBadge, { backgroundColor: colors.error }]}>
+              <Text style={styles.notificationBadgeText}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -296,6 +305,18 @@ const styles = StyleSheet.create({
   notificationButton: {
     padding: SPACING.sm,
     borderRadius: BORDER_RADIUS.round,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: SPACING.xs,
+    borderRadius: BORDER_RADIUS.round,
+  },
+  notificationBadgeText: {
+    fontSize: FONTS.sizes.xs,
+    fontFamily: FONTS.bold,
+    color: '#fff',
   },
   statsCard: {
     margin: SPACING.lg,

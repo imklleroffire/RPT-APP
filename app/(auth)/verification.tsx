@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { auth } from '../../firebase';
+import { auth } from '../config/firebase';
 import { sendEmailVerification } from 'firebase/auth';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { COLORS, FONTS, SPACING } from '../constants/theme';
+import { FONTS, SPACING } from '../constants/theme';
 
 export default function VerificationScreen() {
   const router = useRouter();
@@ -28,8 +28,9 @@ export default function VerificationScreen() {
 
   const handleResendVerification = async () => {
     try {
-      if (auth.currentUser) {
-        await sendEmailVerification(auth.currentUser);
+              const currentUser = auth.currentUser;
+      if (currentUser) {
+        await sendEmailVerification(currentUser);
         setCountdown(60);
         setCanResend(false);
         Alert.alert('Success', 'Verification email sent!');
@@ -46,12 +47,12 @@ export default function VerificationScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
       <Card style={styles.card}>
-        <Text style={[styles.title, { color: colors.text }]}>
+        <Text style={[styles.title, { color: colors.text.primary }]}>
           Verify Your Email
         </Text>
-        <Text style={[styles.message, { color: colors.text }]}>
+        <Text style={[styles.message, { color: colors.text.primary }]}>
           We've sent a verification email to {user?.email}. Please check your inbox and click the verification link.
         </Text>
         

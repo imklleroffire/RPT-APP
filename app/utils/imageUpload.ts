@@ -1,16 +1,16 @@
+import * as ImagePicker from 'expo-image-picker';
 import { storage } from '../config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import * as ImagePicker from 'expo-image-picker';
 
-export const pickAndUploadImage = async () => {
+export const uploadImageFromPicker = async (filename: string): Promise<string> => {
   try {
-    // Request permission
+    // Request permissions
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      throw new Error('Permission to access media library was denied');
+      throw new Error('Permission to access media library is required');
     }
 
-    // Pick the image
+    // Launch image picker
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -18,26 +18,46 @@ export const pickAndUploadImage = async () => {
       quality: 1,
     });
 
-    if (!result.canceled) {
-      const { uri } = result.assets[0];
-      
-      // Convert URI to blob
-      const response = await fetch(uri);
-      const blob = await response.blob();
-
-      // Create a unique filename
-      const filename = `images/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-
-      // Upload to Firebase Storage
-      const storageRef = ref(storage, filename);
-      await uploadBytes(storageRef, blob);
-
-      // Get the download URL
-      const downloadURL = await getDownloadURL(storageRef);
-      
-      return downloadURL;
+    if (result.canceled) {
+      throw new Error('Image selection was cancelled');
     }
-    return null;
+
+    const imageUri = result.assets[0].uri;
+    
+    // Convert image to blob
+    const response = await fetch(imageUri);
+    const blob = await response.blob();
+    
+    // Upload to Firebase Storage
+    const storageRef = ref(storage, filename);
+    const snapshot = await uploadBytes(storageRef, blob);
+    
+    // Get the download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    throw error;
+  }
+};
+
+export const uploadImage = async (uri: string, path: string): Promise<string> => {
+  try {
+    // Convert URI to blob
+    const response = await fetch(uri);
+    const blob = await response.blob();
+
+    // Create storage reference
+    const storageRef = ref(storage, path);
+
+    // Upload to Firebase Storage
+    const snapshot = await uploadBytes(storageRef, blob);
+    
+    // Get download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    return downloadURL;
   } catch (error) {
     console.error('Error uploading image:', error);
     throw error;

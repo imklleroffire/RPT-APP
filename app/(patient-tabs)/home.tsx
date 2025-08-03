@@ -4,10 +4,11 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { db } from '../config/firebase';
 import { FONTS, SPACING, BORDER_RADIUS } from '../constants/theme';
 
 interface Exercise {
@@ -40,6 +41,7 @@ export default function PatientHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
+  const { unreadCount } = useNotifications();
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [recentExercises, setRecentExercises] = useState<Exercise[]>([]);
   const [assignedBundles, setAssignedBundles] = useState<Bundle[]>([]);
@@ -138,6 +140,13 @@ export default function PatientHomeScreen() {
           onPress={() => router.push('/notifications')}
         >
           <Ionicons name="notifications" size={24} color={colors.primary} />
+          {unreadCount > 0 && (
+            <View style={[styles.notificationBadge, { backgroundColor: colors.error }]}>
+              <Text style={styles.notificationBadgeText}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -505,6 +514,18 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.medium,
   },
   duration: {
+    fontSize: FONTS.sizes.sm,
+    fontFamily: FONTS.medium,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 2,
+    borderRadius: 10,
+  },
+  notificationBadgeText: {
+    color: '#fff',
     fontSize: FONTS.sizes.sm,
     fontFamily: FONTS.medium,
   },

@@ -16,7 +16,7 @@ import { Button } from './ui/Button';
 import { Ionicons } from '@expo/vector-icons';
 import { FONTS, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { db } from '../config/firebase';
 import { showAlert } from '../utils/alerts';
 
 interface Therapist {

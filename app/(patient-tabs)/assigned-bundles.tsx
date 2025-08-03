@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { db } from '../../firebase';
+import { db } from '../config/firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { AssignedBundleModal } from '../components/AssignedBundleModal';
 import { isSameDay, addDays } from 'date-fns';
@@ -184,6 +184,8 @@ export default function AssignedBundlesScreen() {
         <AssignedBundleModal
           visible={detailsModalVisible}
           exercises={selectedBundle.exercises || []}
+          bundleId={selectedBundle.id}
+          userId={user?.id || ''}
           onClose={() => setDetailsModalVisible(false)}
           onComplete={() => handleCompleteBundle(selectedBundle.id)}
         />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, View, Text, StyleSheet, Pressable, ScrollView, Image } from 'react-native';
-import { db } from '../../firebase';
+import { db } from '../config/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
 interface Exercise {
@@ -85,6 +85,12 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 16,
     fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  exerciseDescription: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333',
     marginBottom: 8,
   },
   videoContainer: {

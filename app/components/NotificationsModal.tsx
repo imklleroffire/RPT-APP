@@ -13,7 +13,7 @@ interface NotificationsModalProps {
 
 export function NotificationsModal({ visible, onClose }: NotificationsModalProps) {
   const { colors } = useTheme();
-  const { notifications, markAsRead } = useNotifications();
+  const { notifications, markAsRead, unreadCount } = useNotifications();
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -21,10 +21,25 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         return 'person-add';
       case 'bundle_assigned':
         return 'fitness';
-      case 'reminder':
-        return 'alarm';
+      case 'therapist_invite':
+        return 'medical';
+      case 'therapist_added':
+        return 'person';
       default:
         return 'notifications';
+    }
+  };
+
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+    
+    if (diffInHours < 1) {
+      return 'Just now';
+    } else if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)}h ago`;
+    } else {
+      return date.toLocaleDateString();
     }
   };
 
@@ -38,9 +53,16 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
       <View style={[styles.modalContainer, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
         <View style={[styles.modalContent, { backgroundColor: colors.background.secondary }]}>
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text.primary }]}>
-              Notifications
-            </Text>
+            <View style={styles.titleContainer}>
+              <Text style={[styles.title, { color: colors.text.primary }]}>
+                Notifications
+              </Text>
+              {unreadCount > 0 && (
+                <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.badgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </View>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={colors.text.primary} />
             </TouchableOpacity>
@@ -50,12 +72,16 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
             {notifications.length === 0 ? (
               <Card variant="glow" style={styles.section}>
                 <Text style={[styles.emptyText, { color: colors.text.secondary }]}>
-                  No new notifications
+                  No notifications yet
                 </Text>
               </Card>
             ) : (
               notifications.map((notification) => (
-                <Card key={notification.id} variant="glow" style={styles.notificationCard}>
+                <Card 
+                  key={notification.id} 
+                  variant={notification.read ? "glow" : "neon"} 
+                  style={styles.notificationCard}
+                >
                   <TouchableOpacity
                     style={styles.notificationContent}
                     onPress={() => !notification.read && markAsRead(notification.id)}
@@ -76,7 +102,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                           {notification.message}
                         </Text>
                         <Text style={[styles.time, { color: colors.text.secondary }]}>
-                          {notification.createdAt.toLocaleDateString()}
+                          {formatTime(notification.createdAt)}
                         </Text>
                       </View>
                     </View>
@@ -112,6 +138,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.lg,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   title: {
     fontSize: FONTS.sizes.xl,
@@ -175,5 +205,18 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginLeft: SPACING.md,
+  },
+  badge: {
+    borderRadius: 12,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: SPACING.xs,
+    marginLeft: SPACING.sm,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  badgeText: {
+    fontSize: FONTS.sizes.xs,
+    fontFamily: FONTS.bold,
+    color: '#fff',
   },
 }); 

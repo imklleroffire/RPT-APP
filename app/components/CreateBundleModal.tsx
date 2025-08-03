@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 
 interface Exercise {

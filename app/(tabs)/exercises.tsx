@@ -28,7 +28,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { db } from '../config/firebase';
 import { ExerciseDetailsView } from '../components/ExerciseDetailsView';
 import CreateBundleModal from '../components/CreateBundleModal';
 import EditBundleModal from '../components/EditBundleModal';
