@@ -28,7 +28,7 @@ function RootLayoutNav() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Handle navigation logic
+    // Handle navigation logic
   useEffect(() => {
     if (!isInitialized || loading) return;
 
@@ -36,31 +36,36 @@ function RootLayoutNav() {
     const inPatientTabs = segments[0] === '(patient-tabs)';
     const inTherapistTabs = segments[0] === '(tabs)';
 
-    // Don't navigate if we're already on the index page
-    if (!segments || segments.length === 0) {
-      return;
-    }
-    
-    if (segments[0] === 'index') {
-      return;
-    }
+    console.log('[NAVIGATION] Current segments:', segments);
+    console.log('[NAVIGATION] User:', !!user, 'Role:', user?.role);
+    console.log('[NAVIGATION] isPendingVerification:', isPendingVerification);
 
     if (isPendingVerification) {
       if (segments[segments.length - 1] !== 'verification') {
-        router.replace('/verification');
+        console.log('[NAVIGATION] Redirecting to verification');
+        router.replace('/(auth)/verification');
       }
-    } else if (!user && !inAuthGroup) {
-      router.replace('/login');
+    } else if (!user) {
+      // User is not authenticated, redirect to login
+      if (!inAuthGroup || segments[segments.length - 1] === 'register') {
+        console.log('[NAVIGATION] Redirecting to login');
+        router.replace('/(auth)/login');
+      }
     } else if (user) {
+      // User is authenticated, redirect based on role
       if (inAuthGroup) {
         if (user.role === 'patient') {
+          console.log('[NAVIGATION] Redirecting patient to home');
           router.replace('/(patient-tabs)/home');
         } else {
+          console.log('[NAVIGATION] Redirecting therapist to home');
           router.replace('/(tabs)/home');
         }
       } else if (user.role === 'patient' && inTherapistTabs) {
+        console.log('[NAVIGATION] Patient in wrong tabs, redirecting');
         router.replace('/(patient-tabs)/home');
       } else if (user.role === 'therapist' && inPatientTabs) {
+        console.log('[NAVIGATION] Therapist in wrong tabs, redirecting');
         router.replace('/(tabs)/home');
       }
     }

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
-import { auth, db } from '../config/firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendEmailVerification } from 'firebase/auth';
+import { auth, db } from '../../firebase';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut, sendEmailVerification } from 'firebase/auth';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface User {
@@ -33,9 +33,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading=true
   const [error, setError] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false); // Start with false
   const [isPendingVerification, setIsPendingVerification] = useState(false);
 
   // Function to clear all auth state
@@ -53,14 +53,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function start() {
       try {
         console.log('[AUTH] Setting up auth state listener...');
+        setLoading(true);
         
         // Setup auth state listener using Firebase Web SDK
         unsub = onAuthStateChanged(auth, async (firebaseUser) => {
           try {
+            console.log('[AUTH] Auth state changed:', !!firebaseUser);
             if (firebaseUser) {
               // Only check email verification for newly created accounts
               if (!firebaseUser.emailVerified && isPendingVerification) {
                 setUser(null);
+                setLoading(false);
+                setIsInitialized(true);
                 return;
               }
               const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
@@ -79,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   updatedAt: userData?.updatedAt?.toDate?.() || new Date(),
                 });
               } else {
-                await signOut(auth);
+                await firebaseSignOut(auth);
                 setUser(null);
               }
             } else {
@@ -88,11 +92,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (error) {
             console.error('[AUTH] Error in auth state change:', error);
             setUser(null);
+          } finally {
+            setLoading(false);
+            setIsInitialized(true);
           }
         });
 
       } catch (error) {
         console.error('[AUTH] Error setting up auth listener:', error);
+        setLoading(false);
+        setIsInitialized(true);
       }
     }
 
@@ -181,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       setLoading(true);
-      await signOut(auth);
+      await firebaseSignOut(auth);
       clearAuthState();
     } catch (error) {
       console.error('Sign out error:', error);
