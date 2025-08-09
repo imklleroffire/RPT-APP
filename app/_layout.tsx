@@ -47,7 +47,7 @@ function RootLayoutNav() {
       }
     } else if (!user) {
       // User is not authenticated, redirect to login
-      if (!inAuthGroup || segments[segments.length - 1] === 'register') {
+      if (!inAuthGroup || (segments[segments.length - 1] !== 'register' && segments[segments.length - 1] !== 'verification')) {
         console.log('[NAVIGATION] Redirecting to login');
         router.replace('/(auth)/login');
       }

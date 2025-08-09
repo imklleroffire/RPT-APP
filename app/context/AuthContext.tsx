@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
-import { auth, db } from '../../firebase';
+import { auth, db } from '../config/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut, sendEmailVerification } from 'firebase/auth';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
 export interface User {
   id: string;
@@ -27,6 +27,7 @@ export interface AuthContextType {
   deleteAccount: () => Promise<void>;
   setPendingVerification: (pending: boolean) => void;
   isPendingVerification: boolean;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,18 +60,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         unsub = onAuthStateChanged(auth, async (firebaseUser) => {
           try {
             console.log('[AUTH] Auth state changed:', !!firebaseUser);
+            console.log('[AUTH] Firebase user details:', {
+              uid: firebaseUser?.uid,
+              email: firebaseUser?.email,
+              emailVerified: firebaseUser?.emailVerified
+            });
+            
             if (firebaseUser) {
               // Only check email verification for newly created accounts
               if (!firebaseUser.emailVerified && isPendingVerification) {
+                console.log('[AUTH] User not verified, staying in verification state');
                 setUser(null);
                 setLoading(false);
                 setIsInitialized(true);
                 return;
               }
+              
+              console.log('[AUTH] Fetching user document from Firestore...');
               const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+              
               if (userDoc.exists()) {
                 const userData = userDoc.data();
-                setUser({
+                console.log('[AUTH] User document found:', userData);
+                
+                const user = {
                   id: firebaseUser.uid,
                   uid: firebaseUser.uid,
                   name: userData?.name || '',
@@ -81,12 +94,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   therapistId: userData?.therapistId,
                   createdAt: userData?.createdAt?.toDate?.() || new Date(),
                   updatedAt: userData?.updatedAt?.toDate?.() || new Date(),
-                });
+                };
+                
+                console.log('[AUTH] Setting user:', user);
+                setUser(user);
               } else {
-                await firebaseSignOut(auth);
-                setUser(null);
+                console.log('[AUTH] User document not found in Firestore, creating one...');
+                // Create a basic user document if it doesn't exist
+                const basicUserData = {
+                  id: firebaseUser.uid,
+                  uid: firebaseUser.uid,
+                  name: firebaseUser.displayName || 'User',
+                  email: firebaseUser.email || '',
+                  emailVerified: firebaseUser.emailVerified,
+                  role: 'patient', // Default to patient
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                };
+                
+                try {
+                  await setDoc(doc(db, 'users', firebaseUser.uid), basicUserData);
+                  console.log('[AUTH] Created user document successfully');
+                  
+                  const user = {
+                    id: firebaseUser.uid,
+                    uid: firebaseUser.uid,
+                    name: basicUserData.name,
+                    displayName: firebaseUser.displayName || undefined,
+                    email: basicUserData.email,
+                    emailVerified: firebaseUser.emailVerified,
+                    role: basicUserData.role as 'patient' | 'therapist',
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  };
+                  
+                  console.log('[AUTH] Setting user:', user);
+                  setUser(user);
+                } catch (createError) {
+                  console.error('[AUTH] Error creating user document:', createError);
+                  await firebaseSignOut(auth);
+                  setUser(null);
+                }
               }
             } else {
+              console.log('[AUTH] No Firebase user, setting user to null');
               setUser(null);
             }
           } catch (error) {
@@ -110,15 +161,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (unsub) unsub();
     };
-  }, []);
+  }, [isPendingVerification]);
 
   const signIn = async (email: string, password: string) => {
     try {
-      setLoading(true);
+      console.log('[AUTH] Starting sign in process...');
       setError(null);
-      await signInWithEmailAndPassword(auth, email, password);
+      
+      console.log('[AUTH] Calling signInWithEmailAndPassword...');
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('[AUTH] Sign in successful:', userCredential.user.uid);
+      
+      // Don't set loading to false here - let the auth state listener handle it
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error('[AUTH] Sign in error:', error);
+      
       if (error instanceof Error) {
         if (error.message.includes('auth/user-not-found')) {
           setError('No account found with this email address.');
@@ -128,6 +185,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setError('Please enter a valid email address.');
         } else if (error.message.includes('auth/too-many-requests')) {
           setError('Too many failed attempts. Please try again later.');
+        } else if (error.message.includes('auth/api-key-not-valid')) {
+          setError('Authentication service error. Please try again later.');
         } else {
           setError('Failed to sign in. Please check your credentials.');
         }
@@ -135,8 +194,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError('An unexpected error occurred. Please try again.');
       }
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -152,6 +209,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Failed to create user account');
       }
 
+      // Check if there's an existing patient record with this email
+      let existingPatientData: any = null;
+      if (role === 'patient') {
+        try {
+          const patientsQuery = query(
+            collection(db, 'patients'),
+            where('email', '==', email)
+          );
+          const patientsSnapshot = await getDocs(patientsQuery);
+          
+          if (!patientsSnapshot.empty) {
+            const patientDoc = patientsSnapshot.docs[0];
+            existingPatientData = { id: patientDoc.id, ...patientDoc.data() };
+            console.log('[AUTH] Found existing patient record:', existingPatientData);
+          }
+        } catch (error) {
+          console.error('[AUTH] Error checking for existing patient:', error);
+        }
+      }
+
       const userData = {
         id: firebaseUser.uid,
         uid: firebaseUser.uid,
@@ -159,11 +236,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         emailVerified: false,
         role,
+        therapistId: existingPatientData?.therapistId, // Link to existing therapist if found
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
 
       await setDoc(doc(db, 'users', firebaseUser.uid), userData);
+
+      // If there's an existing patient record, update it to link to the new user account
+      if (existingPatientData) {
+        try {
+          await updateDoc(doc(db, 'patients', existingPatientData.id), {
+            userId: firebaseUser.uid,
+            isAppUser: true,
+            status: 'accepted',
+            updatedAt: serverTimestamp(),
+          });
+
+          // Update any notifications sent to this email to include the user ID
+          const notificationsQuery = query(
+            collection(db, 'notifications'),
+            where('toEmail', '==', email)
+          );
+          const notificationsSnapshot = await getDocs(notificationsQuery);
+          
+          const updatePromises = notificationsSnapshot.docs.map(doc => 
+            updateDoc(doc.ref, {
+              toUserId: firebaseUser.uid,
+              updatedAt: serverTimestamp(),
+            })
+          );
+          
+          await Promise.all(updatePromises);
+          console.log('[AUTH] Updated existing patient record and notifications');
+        } catch (error) {
+          console.error('[AUTH] Error updating existing patient record:', error);
+        }
+      }
+
       await sendEmailVerification(firebaseUser);
       setIsPendingVerification(true);
       clearAuthState();
@@ -223,6 +333,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsPendingVerification(pending);
   };
 
+  const clearError = () => {
+    setError(null);
+  };
+
   const value: AuthContextType = {
     user,
     loading,
@@ -233,6 +347,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     deleteAccount,
     setPendingVerification,
     isPendingVerification,
+    clearError,
   };
 
   if (!isInitialized) {

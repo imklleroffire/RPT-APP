@@ -71,22 +71,44 @@ export const AddPatientModal = ({ visible, onClose, onAdd }: AddPatientModalProp
       });
 
       // Create notification for the patient (they'll see this when they join)
-      await addDoc(collection(db, 'notifications'), {
+      console.log('[ADDPATIENT] Creating notification with data:', {
         type: 'patient_invite',
         fromUserId: user?.id,
         fromUserEmail: user?.email,
         fromUserName: user?.name,
-        toEmail: email, // Use email as identifier for non-app users
-        message: `${user?.name || 'A therapist'} has added you as a patient. Please join the app to start your rehabilitation journey.`,
-        createdAt: Timestamp.now(),
-        read: false,
-        data: {
-          patientId: patientRef.id,
-          therapistId: user?.id,
-          therapistName: user?.name,
-          therapistEmail: user?.email,
-        },
+        toEmail: email,
+        message: `${user?.name || 'A therapist'} has added you as a patient. Welcome to your rehabilitation journey! You can now access your personalized exercise bundles and track your progress.`
       });
+
+      try {
+        const notificationRef = await addDoc(collection(db, 'notifications'), {
+          type: 'patient_invite',
+          fromUserId: user?.id,
+          fromUserEmail: user?.email,
+          fromUserName: user?.name,
+          toEmail: email.toLowerCase(), // Store email in lowercase for consistent matching
+          message: `${user?.name || 'A therapist'} has added you as a patient. Welcome to your rehabilitation journey! You can now access your personalized exercise bundles and track your progress.`,
+          createdAt: Timestamp.now(),
+          read: false,
+          data: {
+            patientId: patientRef.id,
+            patientEmail: email.toLowerCase(),
+            therapistId: user?.id,
+            therapistName: user?.name,
+            therapistEmail: user?.email,
+          },
+        });
+
+        console.log('[ADDPATIENT] Created notification successfully:', {
+          notificationId: notificationRef.id,
+          type: 'patient_invite',
+          toEmail: email,
+          message: `${user?.name || 'A therapist'} has added you as a patient. Welcome to your rehabilitation journey! You can now access your personalized exercise bundles and track your progress.`
+        });
+      } catch (error) {
+        console.error('[ADDPATIENT] Error creating notification:', error);
+        Alert.alert('Warning', 'Patient added but notification creation failed. Patient will still be added to your list.');
+      }
 
       Alert.alert(
         'Success',

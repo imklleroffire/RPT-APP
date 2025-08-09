@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, ScrollView, TouchableOpacity } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -14,6 +14,21 @@ interface NotificationsModalProps {
 export function NotificationsModal({ visible, onClose }: NotificationsModalProps) {
   const { colors } = useTheme();
   const { notifications, markAsRead, unreadCount } = useNotifications();
+
+  // Debug notifications in modal
+  useEffect(() => {
+    console.log('[NOTIFICATIONS_MODAL] Modal state:', {
+      visible,
+      notificationsCount: notifications.length,
+      unreadCount,
+      notifications: notifications.map(n => ({
+        id: n.id,
+        type: n.type,
+        message: n.message,
+        read: n.read
+      }))
+    });
+  }, [visible, notifications, unreadCount]);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {

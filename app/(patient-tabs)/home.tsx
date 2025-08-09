@@ -41,12 +41,22 @@ export default function PatientHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
-  const { unreadCount } = useNotifications();
+  const { unreadCount, notifications, createTestNotification } = useNotifications();
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [recentExercises, setRecentExercises] = useState<Exercise[]>([]);
   const [assignedBundles, setAssignedBundles] = useState<Bundle[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Debug notifications
+  useEffect(() => {
+    console.log('[PATIENT_HOME] Notification state:', {
+      unreadCount,
+      totalNotifications: notifications.length,
+      user: user?.id,
+      userEmail: user?.email
+    });
+  }, [unreadCount, notifications.length, user]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -137,7 +147,12 @@ export default function PatientHomeScreen() {
         </View>
         <TouchableOpacity
           style={[styles.notificationButton, { backgroundColor: colors.background.primary }]}
-          onPress={() => router.push('/notifications')}
+          onPress={() => {
+            console.log('[PATIENT_HOME] Notification button pressed');
+            console.log('[PATIENT_HOME] Current notifications:', notifications);
+            console.log('[PATIENT_HOME] Unread count:', unreadCount);
+            router.push('/notifications');
+          }}
         >
           <Ionicons name="notifications" size={24} color={colors.primary} />
           {unreadCount > 0 && (
@@ -209,6 +224,19 @@ export default function PatientHomeScreen() {
             <Ionicons name="calendar" size={24} color={colors.primary} />
             <Text style={[styles.actionText, { color: colors.text.primary }]}>
               View Streaks
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.background.secondary }]}
+            onPress={async () => {
+              console.log('[PATIENT_HOME] Creating test notification...');
+              await createTestNotification();
+              console.log('[PATIENT_HOME] Test notification created');
+            }}
+          >
+            <Ionicons name="add-circle" size={24} color={colors.primary} />
+            <Text style={[styles.actionText, { color: colors.text.primary }]}>
+              Test Notification
             </Text>
           </TouchableOpacity>
         </View>

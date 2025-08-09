@@ -10,7 +10,7 @@ import {
 import { useAuth } from './context/AuthContext';
 import { db } from './config/firebase';
 import { collection, query, where, getDocs, doc, getDoc, Timestamp } from 'firebase/firestore';
-import { Streak } from './config/firebase';
+import { Streak } from './types';
 import { Calendar } from 'react-native-calendars';
 import { format, isSameDay, parseISO } from 'date-fns';
 

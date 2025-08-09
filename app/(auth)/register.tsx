@@ -7,7 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { FONTS, SPACING, BORDER_RADIUS } from '../../constants/theme';
+import { FONTS, SPACING, BORDER_RADIUS } from '../constants/theme';
 
 export default function RegisterScreen() {
   const [step, setStep] = useState<'role' | 'details'>('role');
@@ -19,12 +19,13 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { signUp, error: authError } = useAuth();
   const { colors } = useTheme();
   const glowAnim = new Animated.Value(0);
   const pulseAnim = new Animated.Value(0);
 
   React.useEffect(() => {
+    console.log('[REGISTER] Register screen mounted');
     const startGlowAnimation = () => {
       Animated.loop(
         Animated.sequence([
@@ -61,6 +62,7 @@ export default function RegisterScreen() {
   }, []);
 
   const handleRoleSelect = (selectedRole: 'patient' | 'therapist') => {
+    console.log('[REGISTER] Role selected:', selectedRole);
     setRole(selectedRole);
     setStep('details');
   };
@@ -81,16 +83,25 @@ export default function RegisterScreen() {
       return;
     }
 
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const success = await signUp(email, password, name, role);
+      console.log('[REGISTER] Starting registration...');
+      const success = await signUp(email.trim(), password, name.trim(), role);
+      console.log('[REGISTER] Registration result:', success);
       if (success) {
         router.replace('/verification');
       }
     } catch (err) {
+      console.error('[REGISTER] Registration error:', err);
       // Error is already handled in AuthContext
-      console.log('Registration error:', err);
     } finally {
       setLoading(false);
     }
@@ -133,23 +144,33 @@ export default function RegisterScreen() {
               <View style={styles.roleContainer}>
                 <Button
                   title="I'm a Patient"
-                  onPress={() => handleRoleSelect('patient')}
-                  variant="primary"
+                  onPress={() => {
+                    console.log('[REGISTER] Patient button pressed');
+                    handleRoleSelect('patient');
+                  }}
+                  variant="neon"
                   size="large"
                   style={styles.roleButton}
                 />
 
                 <Button
                   title="I'm a Therapist"
-                  onPress={() => handleRoleSelect('therapist')}
-                  variant="secondary"
+                  onPress={() => {
+                    console.log('[REGISTER] Therapist button pressed');
+                    handleRoleSelect('therapist');
+                  }}
+                  variant="neon"
                   size="large"
                   style={styles.roleButton}
                 />
 
                 <Button
                   title="Back to Sign In"
-                  onPress={() => router.push('/login')}
+                  onPress={() => {
+                    console.log('[REGISTER] Back to sign in pressed');
+                    setError(null);
+                    router.push('/login');
+                  }}
                   variant="outline"
                   size="large"
                   style={styles.roleButton}
@@ -202,9 +223,9 @@ export default function RegisterScreen() {
                 error={error && !confirmPassword ? 'Please confirm your password' : undefined}
               />
 
-              {error && (
+              {(error || authError) && (
                 <View style={[styles.errorContainer, { backgroundColor: colors.error + '20' }]}>
-                  <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+                  <Text style={[styles.errorText, { color: colors.error }]}>{error || authError}</Text>
                 </View>
               )}
 
@@ -213,7 +234,7 @@ export default function RegisterScreen() {
                   title={loading ? 'Creating Account...' : 'Create Account'}
                   onPress={handleRegister}
                   disabled={loading}
-                  variant="primary"
+                  variant="neon"
                   size="large"
                   style={styles.button}
                 />

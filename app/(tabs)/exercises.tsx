@@ -44,6 +44,7 @@ interface Patient {
   id: string;
   name: string;
   email: string;
+  userId?: string; // User ID if patient has joined the app
   selected?: boolean;
 }
 
@@ -218,21 +219,33 @@ export default function ExercisesScreen() {
 
         // Create notifications for assigned patients
         await Promise.all(selectedPatients.map(async (patient) => {
-          await addDoc(collection(db, 'notifications'), {
+          const notificationRef = await addDoc(collection(db, 'notifications'), {
             type: 'bundle_assigned',
             fromUserId: user?.id,
             fromUserEmail: user?.email,
             fromUserName: user?.name,
-            toUserId: patient.id,
+            toUserId: patient.userId || null, // Use userId if patient has joined, otherwise null
+            toEmail: patient.email.toLowerCase(), // Always include email for patients who haven't joined yet
             message: `You have been assigned a new exercise bundle: ${selectedBundle.name}`,
             createdAt: serverTimestamp(),
-        read: false,
-        data: {
+            read: false,
+            data: {
               bundleId: selectedBundle.id,
               bundleName: selectedBundle.name,
+              patientId: patient.id,
+              patientEmail: patient.email.toLowerCase(),
               therapistId: user?.id,
               therapistName: user?.name,
             },
+          });
+
+          console.log('[BUNDLE_ASSIGNMENT] Created notification:', {
+            notificationId: notificationRef.id,
+            type: 'bundle_assigned',
+            toUserId: patient.userId || null,
+            toEmail: patient.email,
+            patientName: patient.name,
+            bundleName: selectedBundle.name
           });
         }));
 
