@@ -19,25 +19,24 @@ export default function SignUpScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [role, setRole] = useState<'patient' | 'therapist' | null>(null);
-  const [loading, setLoading] = useState(false);
-  const { signUp } = useAuth();
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const { signUp, error, clearError, loading } = useAuth();
   const router = useRouter();
 
   const handleSignUp = async () => {
     if (!email || !password || !firstName || !lastName || !role) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setValidationError('Please fill in all fields');
       return;
     }
 
+    setValidationError(null);
+    clearError();
+    
     try {
-      setLoading(true);
-      await signUp(email, password, firstName, lastName, role);
-      router.replace('/');
+      await signUp(email, password, `${firstName} ${lastName}`, role);
+      // AuthContext will handle loading state and navigation automatically
     } catch (error) {
-      console.error('Signup error:', error);
-      Alert.alert('Error', 'Failed to create account. Please try again.');
-    } finally {
-      setLoading(false);
+      // Error is handled by AuthContext, no need to manage loading here
     }
   };
 
@@ -142,6 +141,10 @@ export default function SignUpScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {(validationError || error) && (
+          <Text style={styles.errorText}>{validationError || error}</Text>
+        )}
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
@@ -258,5 +261,12 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#4A90E2',
     fontSize: 14,
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 8,
   },
 }); 

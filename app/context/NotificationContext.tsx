@@ -6,15 +6,18 @@ import { View, ActivityIndicator } from 'react-native';
 
 interface Notification {
   id: string;
-  type: 'patient_invite' | 'bundle_assigned' | 'therapist_added' | 'therapist_invite';
+  type: 'patient_invite' | 'bundle_assigned' | 'therapist_added' | 'therapist_invite' | 'clinic_invitation' | 'therapist_accepted' | 'patient_accepted';
   fromUserId: string;
   fromUserEmail: string;
   fromUserName: string;
   message: string;
   createdAt: Date;
   read: boolean;
+  userId?: string; // Recipient user ID
   toUserId?: string;
   toEmail?: string;
+  clinicId?: string;
+  clinicName?: string;
   data: {
     patientId?: string;
     patientEmail?: string;
@@ -48,106 +51,46 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (user?.id) {
       console.log('[NOTIFICATIONS] Setting up listener for user:', user.id);
       console.log('[NOTIFICATIONS] User email:', user.email);
-      
-      // Query notifications for the current user by both userId and email
-      const q = query(
-        collection(db, 'notifications'),
-        where('toUserId', '==', user.id),
-        orderBy('createdAt', 'desc')
-      );
 
-      // Also query for notifications sent to user's email (for patients who were added before joining)
-      const emailQuery = query(
-        collection(db, 'notifications'),
-        where('toEmail', '==', user.email?.toLowerCase()),
-        orderBy('createdAt', 'desc')
-      );
-
-      console.log('[NOTIFICATIONS] Setting up queries with:', {
-        userId: user.id,
-        userEmail: user.email,
-        userEmailLower: user.email?.toLowerCase(),
-        db: db ? 'connected' : 'not connected'
-      });
-
-      // Debug: Let's also query ALL notifications to see what's in the database
+      // Query ALL notifications and filter by userId field
       const allNotificationsQuery = query(
         collection(db, 'notifications'),
         orderBy('createdAt', 'desc')
       );
 
-      const allNotificationsUnsubscribe = onSnapshot(allNotificationsQuery, allSnapshot => {
-        console.log('[NOTIFICATIONS] ALL notifications in database:', allSnapshot.docs.map(doc => ({
-          id: doc.id,
-          toEmail: doc.data().toEmail,
-          toUserId: doc.data().toUserId,
-          type: doc.data().type,
-          message: doc.data().message
-        })));
-      });
-
-      const unsubscribe = onSnapshot(q, snapshot => {
-        console.log('[NOTIFICATIONS] Received userId snapshot with', snapshot.docs.length, 'notifications');
-        console.log('[NOTIFICATIONS] UserId snapshot docs:', snapshot.docs.map(doc => ({
-          id: doc.id,
-          data: doc.data()
-        })));
+      const unsubscribe = onSnapshot(allNotificationsQuery, snapshot => {
+        console.log('[NOTIFICATIONS] ALL notifications in database:', snapshot.docs.length);
         
-        const userIdNotifications = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate() || new Date(),
-        })) as Notification[];
+        // Filter notifications where userId matches the current user's ID
+        const userNotifications = snapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              createdAt: data.createdAt?.toDate() || new Date(),
+            } as Notification;
+          })
+          .filter(notification => notification.userId === user.id);
 
-        // Also listen for email-based notifications
-        const emailUnsubscribe = onSnapshot(emailQuery, emailSnapshot => {
-          console.log('[NOTIFICATIONS] Received email snapshot with', emailSnapshot.docs.length, 'notifications');
-          console.log('[NOTIFICATIONS] Email snapshot docs:', emailSnapshot.docs.map(doc => ({
-            id: doc.id,
-            data: doc.data()
-          })));
-          
-          const emailNotifications = emailSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate() || new Date(),
-          })) as Notification[];
+        console.log('[NOTIFICATIONS] Filtered notifications for user', user.id, ':', userNotifications.length);
+        console.log('[NOTIFICATIONS] Notification details:', userNotifications.map(n => ({
+          id: n.id,
+          userId: n.userId,
+          type: n.type,
+          message: n.message,
+          read: n.read
+        })));
 
-          // Combine and deduplicate notifications
-          const allNotifications = [...userIdNotifications, ...emailNotifications];
-          const uniqueNotifications = allNotifications.filter((notification, index, self) => 
-            index === self.findIndex(n => n.id === notification.id)
-          );
-
-          console.log('[NOTIFICATIONS] Combined notifications:', uniqueNotifications.length);
-          console.log('[NOTIFICATIONS] Final notifications:', uniqueNotifications.map(n => ({
-            id: n.id,
-            type: n.type,
-            message: n.message,
-            toUserId: n.toUserId,
-            toEmail: n.toEmail,
-            read: n.read
-          })));
-          setNotifications(uniqueNotifications);
-          setLoading(false);
-        }, error => {
-          console.error('[NOTIFICATIONS] Error fetching email notifications:', error);
-          setNotifications(userIdNotifications);
-          setLoading(false);
-        });
-
-        return () => {
-          console.log('[NOTIFICATIONS] Cleaning up email listener');
-          emailUnsubscribe();
-        };
+        setNotifications(userNotifications);
+        setLoading(false);
       }, error => {
-        console.error('[NOTIFICATIONS] Error fetching userId notifications:', error);
+        console.error('[NOTIFICATIONS] Error fetching notifications:', error);
         setLoading(false);
       });
 
       return () => {
-        console.log('[NOTIFICATIONS] Cleaning up userId listener');
-        allNotificationsUnsubscribe();
+        console.log('[NOTIFICATIONS] Cleaning up listener');
         unsubscribe();
       };
     } else {
@@ -228,7 +171,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         fromUserId: user.id,
         fromUserEmail: user.email,
         fromUserName: user.name,
-        toUserId: user.id,
+        userId: user.id, // This is the recipient ID
         toEmail: user.email.toLowerCase(),
         message: 'This is a test notification for the patient account to verify the notification system is working.',
         createdAt: serverTimestamp(),

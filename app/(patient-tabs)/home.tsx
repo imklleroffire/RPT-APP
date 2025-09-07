@@ -95,13 +95,22 @@ export default function PatientHomeScreen() {
 
         // Fetch therapist info
         if (user.therapistId) {
-          const therapistDoc = await getDoc(doc(db, 'therapists', user.therapistId));
+          console.log('[PATIENT_HOME] Fetching therapist with ID:', user.therapistId);
+          const therapistDoc = await getDoc(doc(db, 'users', user.therapistId));
           if (therapistDoc.exists()) {
+            const therapistData = therapistDoc.data();
+            console.log('[PATIENT_HOME] Found therapist:', therapistData);
             setTherapists([{
               id: therapistDoc.id,
-              ...therapistDoc.data()
+              name: therapistData.name,
+              email: therapistData.email,
+              specialization: therapistData.specialization
             } as Therapist]);
+          } else {
+            console.log('[PATIENT_HOME] Therapist not found in users collection');
           }
+        } else {
+          console.log('[PATIENT_HOME] No therapistId found in user data');
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -137,16 +146,22 @@ export default function PatientHomeScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background.primary }]}>
       <View style={[styles.header, { backgroundColor: colors.background.secondary }]}>
-        <View>
-          <Text style={[styles.welcomeText, { color: colors.text.primary }]}>
-            Welcome back,
-          </Text>
-          <Text style={[styles.nameText, { color: colors.text.primary }]}>
-            {user?.name || 'Patient'}
-          </Text>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={[styles.welcomeText, { color: colors.text.primary }]}>
+              Welcome back,
+            </Text>
+            <Text style={[styles.nameText, { color: colors.text.primary }]}>
+              {user?.name || 'Patient'}
+            </Text>
+          </View>
         </View>
+      </View>
+
+      {/* Notifications section with better positioning */}
+      <View style={styles.notificationsSection}>
         <TouchableOpacity
-          style={[styles.notificationButton, { backgroundColor: colors.background.primary }]}
+          style={[styles.notificationCard, { backgroundColor: colors.background.secondary }]}
           onPress={() => {
             console.log('[PATIENT_HOME] Notification button pressed');
             console.log('[PATIENT_HOME] Current notifications:', notifications);
@@ -154,14 +169,24 @@ export default function PatientHomeScreen() {
             router.push('/notifications');
           }}
         >
-          <Ionicons name="notifications" size={24} color={colors.primary} />
-          {unreadCount > 0 && (
-            <View style={[styles.notificationBadge, { backgroundColor: colors.error }]}>
-              <Text style={styles.notificationBadgeText}>
-                {unreadCount > 99 ? '99+' : unreadCount}
+          <View style={styles.notificationContent}>
+            <Ionicons name="notifications" size={24} color={colors.primary} />
+            <View style={styles.notificationText}>
+              <Text style={[styles.notificationTitle, { color: colors.text.primary }]}>
+                Notifications
+              </Text>
+              <Text style={[styles.notificationSubtitle, { color: colors.text.secondary }]}>
+                {unreadCount > 0 ? `${unreadCount} unread` : 'No new notifications'}
               </Text>
             </View>
-          )}
+            {unreadCount > 0 && (
+              <View style={[styles.notificationBadge, { backgroundColor: colors.error }]}>
+                <Text style={styles.notificationBadgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -362,6 +387,7 @@ export default function PatientHomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: 0, // Let the header handle safe area
   },
   loadingContainer: {
     flex: 1,
@@ -369,10 +395,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 20,
+    paddingTop: 60, // Add safe area for iOS
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -384,12 +408,50 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
+  headerContent: {
+    flex: 1,
+  },
   notificationButton: {
     padding: 10,
     borderRadius: 20,
   },
+  notificationsSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  notificationCard: {
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  notificationContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  notificationText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  notificationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  notificationSubtitle: {
+    fontSize: 14,
+  },
   section: {
     padding: 20,
+    paddingTop: 10,
   },
   sectionTitle: {
     fontSize: 20,
@@ -397,8 +459,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   therapistCard: {
-    marginBottom: 12,
-    padding: 16,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   therapistInfo: {
     marginBottom: 12,

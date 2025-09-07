@@ -28,6 +28,9 @@ export interface AuthContextType {
   setPendingVerification: (pending: boolean) => void;
   isPendingVerification: boolean;
   clearError: () => void;
+  refreshUser: () => Promise<void>;
+  handleEmailVerification: () => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -67,8 +70,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
             
             if (firebaseUser) {
-              // Only check email verification for newly created accounts
-              if (!firebaseUser.emailVerified && isPendingVerification) {
+              // Check email verification - if user is not verified, stay in verification state
+              if (!firebaseUser.emailVerified) {
                 console.log('[AUTH] User not verified, staying in verification state');
                 setUser(null);
                 setLoading(false);
@@ -83,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const userData = userDoc.data();
                 console.log('[AUTH] User document found:', userData);
                 
-                const user = {
+                const user: any = {
                   id: firebaseUser.uid,
                   uid: firebaseUser.uid,
                   name: userData?.name || '',
@@ -91,30 +94,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   email: userData?.email || firebaseUser.email || '',
                   emailVerified: firebaseUser.emailVerified,
                   role: userData?.role || 'patient',
-                  therapistId: userData?.therapistId,
                   createdAt: userData?.createdAt?.toDate?.() || new Date(),
                   updatedAt: userData?.updatedAt?.toDate?.() || new Date(),
                 };
+
+                // Only add therapistId if it exists and is not undefined
+                if (userData?.therapistId) {
+                  user.therapistId = userData.therapistId;
+                }
                 
                 console.log('[AUTH] Setting user:', user);
                 setUser(user);
               } else {
-                console.log('[AUTH] User document not found in Firestore, creating one...');
-                // Create a basic user document if it doesn't exist
-                const basicUserData = {
-                  id: firebaseUser.uid,
-                  uid: firebaseUser.uid,
-                  name: firebaseUser.displayName || 'User',
-                  email: firebaseUser.email || '',
-                  emailVerified: firebaseUser.emailVerified,
-                  role: 'patient', // Default to patient
-                  createdAt: serverTimestamp(),
-                  updatedAt: serverTimestamp(),
-                };
+                                 console.log('[AUTH] User document not found in Firestore, creating one...');
+                 // Create a basic user document if it doesn't exist
+                 const basicUserData = {
+                   id: firebaseUser.uid,
+                   uid: firebaseUser.uid,
+                   name: firebaseUser.displayName || 'User',
+                   email: firebaseUser.email || '',
+                   emailVerified: firebaseUser.emailVerified,
+                   role: 'patient', // Default to patient for new users
+                   createdAt: serverTimestamp(),
+                   updatedAt: serverTimestamp(),
+                 };
                 
                 try {
                   await setDoc(doc(db, 'users', firebaseUser.uid), basicUserData);
                   console.log('[AUTH] Created user document successfully');
+                  
+                  // Initialize streak data for new patients (fallback case)
+                  if (basicUserData.role === 'patient') {
+                    try {
+                      // Initialize completedExercises document
+                      await setDoc(doc(db, 'completedExercises', firebaseUser.uid), {
+                        userId: firebaseUser.uid,
+                        lastCompletedDate: null,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp(),
+                      });
+
+                      // Initialize streaks document
+                      await setDoc(doc(db, 'streaks', firebaseUser.uid), {
+                        userId: firebaseUser.uid,
+                        currentStreak: 0,
+                        longestStreak: 0,
+                        lastActivityDate: null,
+                        streakHistory: [],
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp(),
+                      });
+
+                      console.log('[AUTH] Initialized streak data for fallback patient');
+                    } catch (streakError) {
+                      console.error('[AUTH] Error initializing streak data in fallback:', streakError);
+                      // Don't throw error here as user creation should still succeed
+                    }
+                  }
                   
                   const user = {
                     id: firebaseUser.uid,
@@ -167,10 +203,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('[AUTH] Starting sign in process...');
       setError(null);
+      // Don't set loading here - only set it after Firebase confirms credentials are valid
       
       console.log('[AUTH] Calling signInWithEmailAndPassword...');
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       console.log('[AUTH] Sign in successful:', userCredential.user.uid);
+      
+      // Only start loading AFTER Firebase confirms credentials are valid
+      setLoading(true);
       
       // Don't set loading to false here - let the auth state listener handle it
     } catch (error) {
@@ -193,17 +233,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setError('An unexpected error occurred. Please try again.');
       }
+      // Don't set loading to false here since we never set it to true for invalid credentials
       throw error;
     }
   };
 
   const signUp = async (email: string, password: string, name: string, role: 'patient' | 'therapist') => {
     try {
-      setLoading(true);
       setError(null);
+      // Don't set loading here - only set it after Firebase confirms credentials are valid
       
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
+      
+      // Only start loading AFTER Firebase confirms credentials are valid
+      setLoading(true);
       
       if (!firebaseUser) {
         throw new Error('Failed to create user account');
@@ -229,19 +273,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      const userData = {
+      const userData: any = {
         id: firebaseUser.uid,
         uid: firebaseUser.uid,
         name,
         email,
         emailVerified: false,
         role,
-        therapistId: existingPatientData?.therapistId, // Link to existing therapist if found
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
 
+      // Only add therapistId if it exists and is not undefined
+      if (existingPatientData?.therapistId) {
+        userData.therapistId = existingPatientData.therapistId;
+      }
+
       await setDoc(doc(db, 'users', firebaseUser.uid), userData);
+
+      // Initialize streak data for new patients
+      if (role === 'patient') {
+        try {
+          // Initialize completedExercises document
+          await setDoc(doc(db, 'completedExercises', firebaseUser.uid), {
+            userId: firebaseUser.uid,
+            lastCompletedDate: null,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+
+          // Initialize streaks document
+          await setDoc(doc(db, 'streaks', firebaseUser.uid), {
+            userId: firebaseUser.uid,
+            currentStreak: 0,
+            longestStreak: 0,
+            lastActivityDate: null,
+            streakHistory: [],
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+
+          console.log('[AUTH] Initialized streak data for new patient');
+        } catch (streakError) {
+          console.error('[AUTH] Error initializing streak data:', streakError);
+          // Don't throw error here as user creation should still succeed
+        }
+      }
 
       // If there's an existing patient record, update it to link to the new user account
       if (existingPatientData) {
@@ -276,7 +353,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await sendEmailVerification(firebaseUser);
       setIsPendingVerification(true);
-      clearAuthState();
+      setLoading(false);
       return true;
     } catch (error) {
       console.error('Sign up error:', error);
@@ -291,9 +368,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setError('An unexpected error occurred. Please try again.');
       }
+      // Don't set loading to false here since we never set it to true for invalid credentials
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -333,8 +409,107 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsPendingVerification(pending);
   };
 
+  const handleEmailVerification = async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        console.log('[AUTH] Checking email verification status...');
+        // Reload the user to get the latest email verification status
+        await currentUser.reload();
+        
+        if (currentUser.emailVerified) {
+          console.log('[AUTH] Email verified successfully - clearing pending verification');
+          setIsPendingVerification(false);
+          
+          // Force trigger the auth state listener by calling it manually
+          // This ensures the user state is updated immediately
+          try {
+            const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              const user: any = {
+                id: currentUser.uid,
+                uid: currentUser.uid,
+                name: userData?.name || '',
+                displayName: currentUser.displayName || undefined,
+                email: userData?.email || currentUser.email || '',
+                emailVerified: currentUser.emailVerified,
+                role: userData?.role || 'patient',
+                createdAt: userData?.createdAt?.toDate?.() || new Date(),
+                updatedAt: userData?.updatedAt?.toDate?.() || new Date(),
+              };
+
+              // Only add therapistId if it exists and is not undefined
+              if (userData?.therapistId) {
+                user.therapistId = userData.therapistId;
+              }
+              
+              console.log('[AUTH] Setting verified user:', user);
+              setUser(user);
+              setLoading(false);
+            }
+          } catch (error) {
+            console.error('[AUTH] Error fetching user data after verification:', error);
+          }
+        } else {
+          console.log('[AUTH] Email not yet verified');
+        }
+      }
+    } catch (error) {
+      console.error('[AUTH] Error handling email verification:', error);
+    }
+  };
+
+  const resendVerificationEmail = async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        console.log('[AUTH] Resending verification email...');
+        await sendEmailVerification(currentUser);
+        console.log('[AUTH] Verification email sent successfully');
+      } else {
+        console.error('[AUTH] No current user to send verification email to');
+      }
+    } catch (error) {
+      console.error('[AUTH] Error resending verification email:', error);
+      throw error;
+    }
+  };
+
   const clearError = () => {
     setError(null);
+  };
+
+  const refreshUser = async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        // Reload the user from Firebase Auth
+        await currentUser.reload();
+        
+        // Get the latest user document from Firestore
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const updatedUser = {
+            id: currentUser.uid,
+            uid: currentUser.uid,
+            name: userData?.name || '',
+            displayName: currentUser.displayName || undefined,
+            email: userData?.email || currentUser.email || '',
+            emailVerified: currentUser.emailVerified,
+            role: userData?.role || 'patient',
+            therapistId: userData?.therapistId,
+            createdAt: userData?.createdAt?.toDate?.() || new Date(),
+            updatedAt: userData?.updatedAt?.toDate?.() || new Date(),
+          };
+          setUser(updatedUser);
+          console.log('[AUTH] User refreshed successfully:', updatedUser);
+        }
+      }
+    } catch (error) {
+      console.error('[AUTH] Error refreshing user:', error);
+    }
   };
 
   const value: AuthContextType = {
@@ -348,6 +523,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPendingVerification,
     isPendingVerification,
     clearError,
+    refreshUser,
+    handleEmailVerification,
+    resendVerificationEmail,
   };
 
   if (!isInitialized) {

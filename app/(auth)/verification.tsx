@@ -11,7 +11,7 @@ import { FONTS, SPACING } from '../constants/theme';
 
 export default function VerificationScreen() {
   const router = useRouter();
-  const { user, setPendingVerification } = useAuth();
+  const { user, setPendingVerification, resendVerificationEmail } = useAuth();
   const { colors } = useTheme();
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
@@ -28,22 +28,65 @@ export default function VerificationScreen() {
 
   const handleResendVerification = async () => {
     try {
-              const currentUser = auth.currentUser;
-      if (currentUser) {
-        await sendEmailVerification(currentUser);
-        setCountdown(60);
-        setCanResend(false);
-        Alert.alert('Success', 'Verification email sent!');
-      }
+      console.log('[VERIFICATION] Resending verification email...');
+      await resendVerificationEmail();
+      setCountdown(60);
+      setCanResend(false);
+      Alert.alert('Success', 'Verification email sent! Check your inbox and spam folder.');
     } catch (error) {
-      console.error('Error sending verification email:', error);
-      Alert.alert('Error', 'Failed to send verification email');
+      console.error('[VERIFICATION] Error resending verification:', error);
+      // Error is already set in the context
     }
   };
 
-  const handleBackToSignIn = () => {
-    setPendingVerification(false);
-    router.replace('/login');
+  const checkVerificationStatus = async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        console.log('[VERIFICATION] Checking verification status...');
+        console.log('[VERIFICATION] User:', currentUser.email);
+        console.log('[VERIFICATION] Current verified status:', currentUser.emailVerified);
+        
+        // Reload the user to get the latest verification status
+        await currentUser.reload();
+        
+        console.log('[VERIFICATION] After reload - verified status:', currentUser.emailVerified);
+        
+        if (currentUser.emailVerified) {
+          console.log('[VERIFICATION] ✅ Email verified successfully!');
+          Alert.alert('Success', 'Email verified! You can now sign in.');
+          setPendingVerification(false);
+          router.replace('/(auth)/login');
+        } else {
+          console.log('[VERIFICATION] ❌ Email not yet verified');
+          Alert.alert(
+            'Not Verified', 
+            'Please check your email and click the verification link.\n\n' +
+            'If you don\'t see the email, check your spam folder.\n\n' +
+            'Email sent to: ' + currentUser.email
+          );
+        }
+      } else {
+        console.log('[VERIFICATION] No current user found');
+        Alert.alert('Error', 'No user found. Please try signing up again.');
+      }
+    } catch (error) {
+      console.error('[VERIFICATION] Error checking verification status:', error);
+      Alert.alert('Error', 'Failed to check verification status. Please try again.');
+    }
+  };
+
+  const handleBackToSignIn = async () => {
+    try {
+      // Sign out the user
+      await auth.signOut();
+      setPendingVerification(false);
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      setPendingVerification(false);
+      router.replace('/(auth)/login');
+    }
   };
 
   return (
@@ -70,9 +113,23 @@ export default function VerificationScreen() {
         </TouchableOpacity>
 
         <Button
+          onPress={checkVerificationStatus}
+          style={styles.button}
+          title="I've Verified My Email"
+        />
+
+        <Button
+          onPress={handleResendVerification}
+          style={styles.button}
+          title="Resend Verification Email"
+          variant="outline"
+        />
+
+        <Button
           onPress={handleBackToSignIn}
           style={styles.button}
           title="Back to Sign In"
+          variant="outline"
         />
       </Card>
     </View>

@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, collection, addDoc, serverTimestamp, onSnapshot, query, where, deleteDoc } from 'firebase/firestore';
+import { doc, collection, addDoc, serverTimestamp, onSnapshot, query, where, deleteDoc, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { showAlert } from '../utils/alerts';
 import { Card } from '../components/ui/Card';
@@ -100,6 +100,8 @@ export default function PatientsScreen() {
   }, [user?.id]);
 
   const addNewPatient = async () => {
+    console.log('[PATIENTS] addNewPatient called with:', newPatient);
+    
     if (!user) return;
 
     if (!newPatient.name || !newPatient.email || !newPatient.phone) {
@@ -108,6 +110,7 @@ export default function PatientsScreen() {
     }
 
     try {
+      console.log('[PATIENTS] Creating patient...');
       const patientData = {
         ...newPatient,
         therapistId: user.id,
@@ -117,7 +120,55 @@ export default function PatientsScreen() {
         updatedAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, 'patients'), patientData);
+      const patientRef = await addDoc(collection(db, 'patients'), patientData);
+      console.log('[PATIENTS] Patient created successfully:', patientRef.id);
+
+      // Search for patient's userId in users collection by email
+      console.log('[PATIENTS] Searching for patient userId by email:', newPatient.email);
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('email', '==', newPatient.email.toLowerCase())
+      );
+      const usersSnapshot = await getDocs(usersQuery);
+      
+      let patientUserId = null;
+      if (!usersSnapshot.empty) {
+        const userDoc = usersSnapshot.docs[0];
+        patientUserId = userDoc.id; // Document name is the userId
+        console.log('[PATIENTS] Found patient userId:', patientUserId);
+      } else {
+        console.log('[PATIENTS] No user found with email:', newPatient.email);
+      }
+
+      // Create notification for the patient
+      console.log('[PATIENTS] Creating notification...');
+      const notificationData = {
+        type: 'patient_invite',
+        fromUserId: user.id,
+        fromUserEmail: user.email,
+        fromUserName: user.name,
+        userId: patientUserId, // Use the actual patient userId
+        toEmail: newPatient.email.toLowerCase(),
+        message: `${user.name} has invited you to join their clinic.`,
+        createdAt: serverTimestamp(),
+        read: false,
+        data: {
+          patientId: patientRef.id,
+          patientEmail: newPatient.email.toLowerCase(),
+          therapistId: user.id,
+          therapistName: user.name,
+        },
+      };
+
+      const notificationRef = await addDoc(collection(db, 'notifications'), notificationData);
+      console.log('[PATIENTS] SUCCESS! Notification created with ID:', notificationRef.id);
+      console.log('[PATIENTS] Notification details:', {
+        notificationId: notificationRef.id,
+        patientUserId: patientUserId,
+        patientEmail: newPatient.email.toLowerCase(),
+        therapistName: user.name
+      });
+
       setIsAddModalVisible(false);
       setNewPatient({
         name: '',
@@ -211,16 +262,31 @@ export default function PatientsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
       <View style={[styles.header, { backgroundColor: colors.background.secondary }]}>
+        <View style={styles.headerContent}>
         <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
           Patients
         </Text>
-        <Button
-          title="Add Patient"
+        </View>
+      </View>
+
+      {/* Add Patient section */}
+      <View style={styles.addPatientSection}>
+        <TouchableOpacity
+          style={[styles.addPatientCard, { backgroundColor: colors.background.secondary }]}
           onPress={() => setIsAddModalVisible(true)}
-          variant="primary"
-          size="medium"
-          icon="add"
-        />
+        >
+          <View style={styles.addPatientContent}>
+            <Ionicons name="person-add" size={32} color={colors.primary} />
+            <View style={styles.addPatientText}>
+              <Text style={[styles.addPatientTitle, { color: colors.text.primary }]}>
+                Add New Patient
+              </Text>
+              <Text style={[styles.addPatientSubtitle, { color: colors.text.secondary }]}>
+                Invite patients to join your clinic
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
       </View>
 
       {patients.length === 0 ? (
@@ -416,10 +482,45 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: SPACING.lg,
+    paddingTop: 60, // Add safe area for iOS
+  },
+  headerContent: {
+    flex: 1,
+  },
+  addPatientSection: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  addPatientCard: {
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  addPatientContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addPatientText: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  addPatientTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  addPatientSubtitle: {
+    fontSize: 14,
   },
   headerTitle: {
     fontSize: FONTS.sizes.xl,

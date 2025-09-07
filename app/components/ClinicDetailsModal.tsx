@@ -18,6 +18,7 @@ import { FONTS, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { showAlert } from '../utils/alerts';
+import ClinicManagementModal from './ClinicManagementModal';
 
 interface Therapist {
   id: string;
@@ -46,6 +47,7 @@ export default function ClinicDetailsModal({
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+  const [showClinicManagement, setShowClinicManagement] = useState(false);
 
   useEffect(() => {
     fetchTherapists();
@@ -136,8 +138,13 @@ export default function ClinicDetailsModal({
               <Button
                 title="Manage Clinic"
                 onPress={() => {
-                  // Add clinic management functionality
-                  showAlert('Info', 'Clinic management feature coming soon');
+                  console.log('[CLINIC_DETAILS] Opening clinic management with clinic data:', {
+                    id: clinicId,
+                    name: clinicName,
+                    therapistId: user?.id,
+                    therapists: therapists.map(t => t.id),
+                  });
+                  setShowClinicManagement(true);
                 }}
                 variant="outline"
                 size="small"
@@ -215,6 +222,22 @@ export default function ClinicDetailsModal({
           </ScrollView>
         </View>
       </View>
+
+      <ClinicManagementModal
+        visible={showClinicManagement}
+        clinic={{
+          id: clinicId,
+          name: clinicName,
+          therapistId: user?.id || '', // Use therapistId to match the clinic structure
+          therapists: therapists.map(t => t.id),
+          createdAt: new Date(),
+        }}
+        onClose={() => setShowClinicManagement(false)}
+        onUpdate={() => {
+          fetchTherapists();
+          setShowClinicManagement(false);
+        }}
+      />
     </Modal>
   );
 }

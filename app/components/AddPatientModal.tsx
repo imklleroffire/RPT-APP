@@ -10,7 +10,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { db } from '../config/firebase';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { showAlert } from '../utils/alerts';
 
@@ -50,11 +50,14 @@ export const AddPatientModal = ({ visible, onClose, onAdd }: AddPatientModalProp
   };
 
   const handleSubmit = async () => {
+    console.log('[ADDPATIENT] handleSubmit called with:', { name, email, phone });
+    
     if (!name || !email || !phone) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
+    console.log('[ADDPATIENT] Starting patient creation...');
     setLoading(true);
     try {
       // Create patient document
@@ -70,45 +73,26 @@ export const AddPatientModal = ({ visible, onClose, onAdd }: AddPatientModalProp
         updatedAt: Timestamp.now(),
       });
 
-      // Create notification for the patient (they'll see this when they join)
-      console.log('[ADDPATIENT] Creating notification with data:', {
+      console.log('[ADDPATIENT] Patient created successfully:', patientRef.id);
+
+      // Create a simple notification
+      console.log('[ADDPATIENT] Creating simple notification...');
+      
+      const simpleNotification = {
         type: 'patient_invite',
         fromUserId: user?.id,
         fromUserEmail: user?.email,
         fromUserName: user?.name,
-        toEmail: email,
-        message: `${user?.name || 'A therapist'} has added you as a patient. Welcome to your rehabilitation journey! You can now access your personalized exercise bundles and track your progress.`
-      });
+        userId: 'test-patient-id', // Just use a test ID for now
+        toEmail: email.toLowerCase(),
+        message: `${user?.name || 'A therapist'} has invited you to join their clinic.`,
+        createdAt: serverTimestamp(),
+        read: false,
+      };
 
-      try {
-        const notificationRef = await addDoc(collection(db, 'notifications'), {
-          type: 'patient_invite',
-          fromUserId: user?.id,
-          fromUserEmail: user?.email,
-          fromUserName: user?.name,
-          toEmail: email.toLowerCase(), // Store email in lowercase for consistent matching
-          message: `${user?.name || 'A therapist'} has added you as a patient. Welcome to your rehabilitation journey! You can now access your personalized exercise bundles and track your progress.`,
-          createdAt: Timestamp.now(),
-          read: false,
-          data: {
-            patientId: patientRef.id,
-            patientEmail: email.toLowerCase(),
-            therapistId: user?.id,
-            therapistName: user?.name,
-            therapistEmail: user?.email,
-          },
-        });
-
-        console.log('[ADDPATIENT] Created notification successfully:', {
-          notificationId: notificationRef.id,
-          type: 'patient_invite',
-          toEmail: email,
-          message: `${user?.name || 'A therapist'} has added you as a patient. Welcome to your rehabilitation journey! You can now access your personalized exercise bundles and track your progress.`
-        });
-      } catch (error) {
-        console.error('[ADDPATIENT] Error creating notification:', error);
-        Alert.alert('Warning', 'Patient added but notification creation failed. Patient will still be added to your list.');
-      }
+      console.log('[ADDPATIENT] Adding notification to Firestore...');
+      const notificationRef = await addDoc(collection(db, 'notifications'), simpleNotification);
+      console.log('[ADDPATIENT] SUCCESS! Notification created with ID:', notificationRef.id);
 
       Alert.alert(
         'Success',
@@ -192,7 +176,10 @@ export const AddPatientModal = ({ visible, onClose, onAdd }: AddPatientModalProp
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.button, styles.submitButton]}
-              onPress={handleSubmit}
+              onPress={() => {
+                console.log('[ADDPATIENT] Button pressed!');
+                handleSubmit();
+              }}
               disabled={loading}
             >
               {loading ? (

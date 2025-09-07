@@ -28,6 +28,7 @@ interface Bundle {
   coverImage: string;
   exercises: Exercise[];
   completed?: boolean;
+  lastCompletedDate?: Date | null;
 }
 
 interface Streak {
@@ -67,7 +68,45 @@ export default function AssignedBundlesScreen() {
         ...doc.data(),
       })) as Bundle[];
 
-      setBundles(bundlesList);
+      // Check completion status for each bundle
+      const bundlesWithCompletionStatus = await Promise.all(
+        bundlesList.map(async (bundle) => {
+          try {
+            const bundleRef = doc(db, 'completedExercises', `${user.id}_${bundle.id}`);
+            const bundleDoc = await getDoc(bundleRef);
+
+            if (bundleDoc.exists()) {
+              const data = bundleDoc.data();
+              const lastCompletedDate = data.lastCompletedDate?.toDate();
+              const today = new Date();
+
+              // Check if bundle was completed today
+              const isCompletedToday = lastCompletedDate && isSameDay(today, lastCompletedDate);
+              
+              return {
+                ...bundle,
+                completed: isCompletedToday,
+                lastCompletedDate: lastCompletedDate
+              };
+            } else {
+              return {
+                ...bundle,
+                completed: false,
+                lastCompletedDate: null
+              };
+            }
+          } catch (error) {
+            console.error(`Error checking completion status for bundle ${bundle.id}:`, error);
+            return {
+              ...bundle,
+              completed: false,
+              lastCompletedDate: null
+            };
+          }
+        })
+      );
+
+      setBundles(bundlesWithCompletionStatus);
     } catch (error) {
       console.error('Error fetching assigned bundles:', error);
     } finally {
@@ -76,23 +115,31 @@ export default function AssignedBundlesScreen() {
   };
 
   const handleCompleteBundle = async (bundleId: string) => {
+    console.log('[ASSIGNED_BUNDLES] handleCompleteBundle called with bundleId:', bundleId);
+    console.log('[ASSIGNED_BUNDLES] user?.id:', user?.id);
+    
     try {
-      const bundleRef = doc(db, 'bundles', bundleId);
-      await updateDoc(bundleRef, {
-        completed: true,
-        completedAt: new Date(),
-      });
-
+      const today = new Date();
+      
+      // Update bundle completion status
       setBundles(currentBundles =>
         currentBundles.map(bundle =>
-          bundle.id === bundleId ? { ...bundle, completed: true } : bundle
+          bundle.id === bundleId ? { 
+            ...bundle, 
+            completed: true,
+            lastCompletedDate: today
+          } : bundle
         )
       );
 
+      console.log('[ASSIGNED_BUNDLES] Bundle state updated');
       showAlert('Success', 'Bundle completed successfully!');
       setDetailsModalVisible(false);
+      
+      // Note: Streaks are now handled by the AssignedBundleModal when exercises are completed
+      // This prevents duplicate streak calculations
     } catch (error) {
-      console.error('Error completing bundle:', error);
+      console.error('[ASSIGNED_BUNDLES] Error completing bundle:', error);
       showAlert('Error', 'Failed to complete bundle. Please try again.');
     }
   };
@@ -129,7 +176,7 @@ export default function AssignedBundlesScreen() {
           <View style={styles.exerciseCount}>
             <Ionicons name="fitness-outline" size={20} color={colors.primary} />
             <Text style={[styles.exerciseCountText, { color: colors.text.secondary }]}>
-              {bundle.exercises?.length || 0} exercises
+              {bundle.exercises && Array.isArray(bundle.exercises) ? bundle.exercises.length : 0} exercises
             </Text>
           </View>
 
@@ -183,7 +230,7 @@ export default function AssignedBundlesScreen() {
       {selectedBundle && (
         <AssignedBundleModal
           visible={detailsModalVisible}
-          exercises={selectedBundle.exercises || []}
+          exercises={selectedBundle.exercises && Array.isArray(selectedBundle.exercises) ? selectedBundle.exercises : []}
           bundleId={selectedBundle.id}
           userId={user?.id || ''}
           onClose={() => setDetailsModalVisible(false)}

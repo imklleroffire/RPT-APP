@@ -72,12 +72,28 @@ export default function ExercisesScreen() {
       );
 
       const querySnapshot = await getDocs(q);
-      const loadedBundles = querySnapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      })) as Bundle[];
+      const loadedBundles = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('[EXERCISES] Loading bundle from Firestore:', doc.id, data);
+        console.log('[EXERCISES] Bundle exercises from Firestore:', data.exercises);
+        
+        // Ensure all required fields are present and properly typed
+        const bundle: Bundle = {
+          id: doc.id,
+          name: data.name || '',
+          description: data.description || '',
+          coverImage: data.coverImage || '',
+          exercises: Array.isArray(data.exercises) ? data.exercises : [],
+          assignedPatients: Array.isArray(data.assignedPatients) ? data.assignedPatients : [],
+          frequency: data.frequency || 'weekly',
+          customDays: Array.isArray(data.customDays) ? data.customDays : [],
+          createdBy: data.createdBy || '',
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+          completed: data.completed || false,
+        };
+        return bundle;
+      });
       
       if (loadedBundles.length === 0) {
         const defaultBundles = await createDefaultBundles();
@@ -207,9 +223,28 @@ export default function ExercisesScreen() {
       
       if (bundleDoc.exists()) {
         const currentAssignedPatients = bundleDoc.data().assignedPatients || [];
+        // Get the actual user IDs for the selected patients
+        const patientUserIds = [];
+        for (const patient of selectedPatients) {
+          // Search for the patient's user ID in the users collection
+          const usersQuery = query(
+            collection(db, 'users'),
+            where('email', '==', patient.email.toLowerCase())
+          );
+          const usersSnapshot = await getDocs(usersQuery);
+          
+          if (!usersSnapshot.empty) {
+            const userDoc = usersSnapshot.docs[0];
+            patientUserIds.push(userDoc.id); // This is the actual user ID
+            console.log('[EXERCISES] Found patient user ID:', userDoc.id, 'for patient:', patient.name);
+          } else {
+            console.log('[EXERCISES] No user found for patient:', patient.email);
+          }
+        }
+
         const newAssignedPatients = [...new Set([
           ...currentAssignedPatients,
-          ...selectedPatients.map(p => p.id)
+          ...patientUserIds
         ])];
 
         await updateDoc(bundleRef, {
@@ -219,17 +254,34 @@ export default function ExercisesScreen() {
 
         // Create notifications for assigned patients
         await Promise.all(selectedPatients.map(async (patient) => {
+          // Search for patient's userId in users collection by email
+          console.log('[EXERCISES] Searching for patient userId by email:', patient.email);
+          const usersQuery = query(
+            collection(db, 'users'),
+            where('email', '==', patient.email.toLowerCase())
+          );
+          const usersSnapshot = await getDocs(usersQuery);
+          
+          let patientUserId = null;
+          if (!usersSnapshot.empty) {
+            const userDoc = usersSnapshot.docs[0];
+            patientUserId = userDoc.id; // Document name is the userId
+            console.log('[EXERCISES] Found patient userId:', patientUserId);
+          } else {
+            console.log('[EXERCISES] No user found with email:', patient.email);
+          }
+
           const notificationRef = await addDoc(collection(db, 'notifications'), {
             type: 'bundle_assigned',
             fromUserId: user?.id,
             fromUserEmail: user?.email,
             fromUserName: user?.name,
-            toUserId: patient.userId || null, // Use userId if patient has joined, otherwise null
-            toEmail: patient.email.toLowerCase(), // Always include email for patients who haven't joined yet
+            userId: patientUserId, // Use the found userId or null if not found
+            toEmail: patient.email.toLowerCase(),
             message: `You have been assigned a new exercise bundle: ${selectedBundle.name}`,
             createdAt: serverTimestamp(),
-            read: false,
-            data: {
+        read: false,
+        data: {
               bundleId: selectedBundle.id,
               bundleName: selectedBundle.name,
               patientId: patient.id,
@@ -242,7 +294,7 @@ export default function ExercisesScreen() {
           console.log('[BUNDLE_ASSIGNMENT] Created notification:', {
             notificationId: notificationRef.id,
             type: 'bundle_assigned',
-            toUserId: patient.userId || null,
+            toUserId: patientUserId || null,
             toEmail: patient.email,
             patientName: patient.name,
             bundleName: selectedBundle.name
@@ -260,20 +312,29 @@ export default function ExercisesScreen() {
     }
   };
 
-  const handleEditBundle = async (updatedExercises: Exercise[]) => {
+  const handleEditBundle = async (updatedBundle: { name: string; description: string; exercises: Exercise[]; coverImage: string }) => {
     if (!selectedBundle) return;
 
     try {
       const bundleRef = doc(db, 'bundles', selectedBundle.id);
       await updateDoc(bundleRef, {
-        exercises: updatedExercises,
+        name: updatedBundle.name,
+        description: updatedBundle.description,
+        exercises: updatedBundle.exercises,
+        coverImage: updatedBundle.coverImage,
         updatedAt: serverTimestamp(),
       });
 
       // Update local state
       setBundles(bundles.map(bundle =>
         bundle.id === selectedBundle.id
-          ? { ...bundle, exercises: updatedExercises }
+          ? { 
+              ...bundle, 
+              name: updatedBundle.name,
+              description: updatedBundle.description,
+              exercises: updatedBundle.exercises,
+              coverImage: updatedBundle.coverImage
+            }
           : bundle
       ));
 
@@ -286,47 +347,61 @@ export default function ExercisesScreen() {
     }
   };
 
-  const renderBundleCard = ({ item }: { item: Bundle }) => (
-    <Card variant="neon" style={styles.bundleCard}>
-      <Image source={{ uri: item.coverImage }} style={styles.bundleImage} />
-      <View style={styles.bundleContent}>
-        <Text style={[styles.bundleName, { color: colors.text.primary }]}>
-          {item.name}
-        </Text>
-        <Text style={[styles.bundleDescription, { color: colors.text.secondary }]}>
-          {item.description}
-        </Text>
-        <Text style={[styles.exerciseCount, { color: colors.text.secondary }]}>
-          {item.exercises.length} exercises
-        </Text>
+  const renderBundleCard = ({ item }: { item: Bundle }) => {
+    // Ensure item has all required properties
+    const safeItem = {
+      ...item,
+      exercises: Array.isArray(item?.exercises) ? item.exercises : [],
+      name: item?.name || 'Unnamed Bundle',
+      description: item?.description || '',
+      coverImage: item?.coverImage || '',
+    };
+
+    return (
+      <Card variant="neon" style={styles.bundleCard}>
+        <Image source={{ uri: safeItem.coverImage }} style={styles.bundleImage} />
+        <View style={styles.bundleContent}>
+          <Text style={[styles.bundleName, { color: colors.text.primary }]}>
+            {safeItem.name}
+          </Text>
+          <Text style={[styles.bundleDescription, { color: colors.text.secondary }]}>
+            {safeItem.description}
+          </Text>
+          <Text style={[styles.exerciseCount, { color: colors.text.secondary }]}>
+            {safeItem.exercises.length} exercises
+          </Text>
         
-        <View style={styles.bundleActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.background.secondary }]}
-            onPress={() => {
-              setSelectedBundle(item);
-              setIsEditModalVisible(true);
-            }}
-          >
-            <Ionicons name="create-outline" size={20} color={colors.primary} />
-            <Text style={[styles.actionText, { color: colors.text.primary }]}>Edit</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.background.secondary }]}
-            onPress={() => {
-              setSelectedBundle(item);
-              fetchPatients();
-              setIsAssignModalVisible(true);
-            }}
-          >
-            <Ionicons name="share-outline" size={20} color={colors.primary} />
-            <Text style={[styles.actionText, { color: colors.text.primary }]}>Assign</Text>
-          </TouchableOpacity>
+                  <View style={styles.bundleActions}>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.background.secondary }]}
+              onPress={() => {
+                console.log('[EXERCISES] Edit button pressed for bundle:', safeItem);
+                console.log('[EXERCISES] Bundle exercises:', safeItem.exercises);
+                console.log('[EXERCISES] Bundle exercises length:', safeItem.exercises?.length);
+                setSelectedBundle(safeItem);
+                setIsEditModalVisible(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={20} color={colors.primary} />
+              <Text style={[styles.actionText, { color: colors.text.primary }]}>Edit</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.background.secondary }]}
+              onPress={() => {
+                setSelectedBundle(safeItem);
+                fetchPatients();
+                setIsAssignModalVisible(true);
+              }}
+            >
+              <Ionicons name="share-outline" size={20} color={colors.primary} />
+              <Text style={[styles.actionText, { color: colors.text.primary }]}>Assign</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   if (loading) {
     return (
@@ -339,13 +414,28 @@ export default function ExercisesScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
       <View style={[styles.header, { backgroundColor: colors.background.secondary }]}>
+        <View style={styles.headerContent}>
         <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Exercise Bundles</Text>
+        </View>
+      </View>
+
+      {/* Create Bundle section */}
+      <View style={styles.createBundleSection}>
         <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
+          style={[styles.createBundleCard, { backgroundColor: colors.background.secondary }]}
           onPress={() => setIsCreateModalVisible(true)}
         >
-          <Ionicons name="add" size={24} color={colors.text.primary} />
-          <Text style={[styles.addButtonText, { color: colors.text.primary }]}>Create Bundle</Text>
+          <View style={styles.createBundleContent}>
+            <Ionicons name="add-circle" size={32} color={colors.primary} />
+            <View style={styles.createBundleText}>
+              <Text style={[styles.createBundleTitle, { color: colors.text.primary }]}>
+                Create New Bundle
+              </Text>
+              <Text style={[styles.createBundleSubtitle, { color: colors.text.secondary }]}>
+                Build custom exercise bundles for your patients
+              </Text>
+            </View>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -364,7 +454,7 @@ export default function ExercisesScreen() {
 
       <EditBundleModal
         visible={isEditModalVisible}
-        exercises={selectedBundle?.exercises || []}
+        bundle={selectedBundle}
         onClose={() => setIsEditModalVisible(false)}
         onSave={handleEditBundle}
       />
@@ -438,10 +528,45 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: SPACING.lg,
+    paddingTop: 60, // Add safe area for iOS
+  },
+  headerContent: {
+    flex: 1,
+  },
+  createBundleSection: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  createBundleCard: {
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  createBundleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  createBundleText: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  createBundleTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  createBundleSubtitle: {
+    fontSize: 14,
   },
   headerTitle: {
     fontSize: FONTS.sizes.xl,

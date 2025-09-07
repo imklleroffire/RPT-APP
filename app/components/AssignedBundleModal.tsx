@@ -6,6 +6,7 @@ import { isSameDay, addDays } from 'date-fns';
 import { showAlert } from '../utils/alerts';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { streaksService } from '../services/streaksService';
 import { FONTS, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
@@ -120,16 +121,36 @@ export function AssignedBundleModal({
   const isBundleComplete = completedExercises.length === exercises.length;
 
   const handleCompleteBundle = async () => {
+    console.log('[ASSIGNED_BUNDLE_MODAL] handleCompleteBundle called');
+    console.log('[ASSIGNED_BUNDLE_MODAL] isBundleComplete:', isBundleComplete);
+    console.log('[ASSIGNED_BUNDLE_MODAL] completedExercises:', completedExercises);
+    console.log('[ASSIGNED_BUNDLE_MODAL] exercises.length:', exercises.length);
+    
     if (!isBundleComplete) {
       showAlert('Incomplete Bundle', 'Please complete all exercises before marking the bundle as complete.');
       return;
     }
 
     try {
+      console.log('[ASSIGNED_BUNDLE_MODAL] Calling onComplete...');
       await onComplete();
-      showAlert('Success', 'Bundle completed successfully!');
+      
+      // Update streaks with completed exercises
+      const today = new Date();
+      const assignedExercises = await streaksService.getAssignedExercises(userId);
+      const completedExercises = assignedExercises.map(ex => ({
+        ...ex,
+        completed: true,
+        completedAt: today
+      }));
+      
+      await streaksService.updateCompletedExercises(userId, today, completedExercises);
+      
+      console.log('[ASSIGNED_BUNDLE_MODAL] onComplete successful');
+      showAlert('Success', 'Bundle completed successfully! Your streak has been updated!');
       onClose();
     } catch (error) {
+      console.error('[ASSIGNED_BUNDLE_MODAL] Error completing bundle:', error);
       showAlert('Error', 'Failed to complete the bundle. Please try again.');
     }
   };

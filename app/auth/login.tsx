@@ -14,25 +14,24 @@ import { useAuth } from '../context/AuthContext';
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const { signIn, error, clearError, loading } = useAuth();
   const router = useRouter();
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setValidationError('Please fill in all fields');
       return;
     }
 
+    setValidationError(null);
+    clearError();
+    
     try {
-      setLoading(true);
       await signIn(email, password);
-      router.replace('/');
+      // AuthContext will handle loading state and navigation automatically
     } catch (error) {
-      console.error('Login error:', error);
-      Alert.alert('Error', 'Failed to sign in. Please check your credentials.');
-    } finally {
-      setLoading(false);
+      // Error is handled by AuthContext, no need to manage loading here
     }
   };
 
@@ -66,6 +65,10 @@ export default function LoginScreen() {
             secureTextEntry
           />
         </View>
+
+        {(validationError || error) && (
+          <Text style={styles.errorText}>{validationError || error}</Text>
+        )}
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
@@ -152,5 +155,12 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#4A90E2',
     fontSize: 14,
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 8,
   },
 }); 

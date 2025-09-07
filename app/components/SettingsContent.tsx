@@ -19,6 +19,7 @@ import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { showAlert } from '../utils/alerts';
 import { THEME_OPTIONS } from '../context/ThemeContext';
+import FixRoleButton from './FixRoleButton';
 
 type ThemeId = typeof THEME_OPTIONS[number]['id'];
 
@@ -149,6 +150,12 @@ export function SettingsContent({ onClose, showBackButton }: SettingsContentProp
               {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Not available'}
             </Text>
           </View>
+          
+          {/* Temporary fix button for role issues */}
+          {user?.role === 'patient' && (
+            <FixRoleButton />
+          )}
+          
           <Button
             title="Sign Out"
             onPress={handleSignOut}

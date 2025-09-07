@@ -16,30 +16,123 @@ export const EXERCISE_IMAGES = [
 export const DEFAULT_BUNDLES = [
   {
     name: 'Upper Body Strength',
+    description: 'Build strength in your upper body with these essential exercises',
     exercises: [
-      { name: 'Push-ups', reps: 10 },
-      { name: 'Dumbbell Rows', reps: 12 },
-      { name: 'Shoulder Press', reps: 10 },
+      { 
+        name: 'Push-ups', 
+        description: 'Classic upper body exercise',
+        instructions: 'Start in a plank position, lower your body until your chest nearly touches the floor, then push back up',
+        reps: 10,
+        duration: 0,
+        difficulty: 'medium' as const,
+        category: 'strength',
+        imageUrl: EXERCISE_IMAGES[0],
+        restTime: 60
+      },
+      { 
+        name: 'Dumbbell Rows', 
+        description: 'Target your back muscles',
+        instructions: 'Bend at the waist, hold dumbbells, and pull them up towards your chest',
+        reps: 12,
+        duration: 0,
+        difficulty: 'medium' as const,
+        category: 'strength',
+        imageUrl: EXERCISE_IMAGES[0],
+        restTime: 60
+      },
+      { 
+        name: 'Shoulder Press', 
+        description: 'Strengthen your shoulders',
+        instructions: 'Sit or stand with dumbbells at shoulder level, press them overhead',
+        reps: 10,
+        duration: 0,
+        difficulty: 'medium' as const,
+        category: 'strength',
+        imageUrl: EXERCISE_IMAGES[0],
+        restTime: 60
+      },
     ],
-    image: EXERCISE_IMAGES[0],
+    coverImage: EXERCISE_IMAGES[0],
   },
   {
     name: 'Core Workout',
+    description: 'Strengthen your core muscles for better stability and posture',
     exercises: [
-      { name: 'Plank', duration: 30 },
-      { name: 'Crunches', reps: 15 },
-      { name: 'Russian Twists', reps: 20 },
+      { 
+        name: 'Plank', 
+        description: 'Core stability exercise',
+        instructions: 'Hold a plank position with your body in a straight line from head to heels',
+        reps: 0,
+        duration: 30,
+        difficulty: 'easy' as const,
+        category: 'core',
+        imageUrl: EXERCISE_IMAGES[3],
+        restTime: 30
+      },
+      { 
+        name: 'Crunches', 
+        description: 'Target your abdominal muscles',
+        instructions: 'Lie on your back, lift your shoulders off the ground while keeping your lower back pressed down',
+        reps: 15,
+        duration: 0,
+        difficulty: 'easy' as const,
+        category: 'core',
+        imageUrl: EXERCISE_IMAGES[3],
+        restTime: 30
+      },
+      { 
+        name: 'Russian Twists', 
+        description: 'Work your obliques',
+        instructions: 'Sit with knees bent, lean back slightly, and twist your torso from side to side',
+        reps: 20,
+        duration: 0,
+        difficulty: 'medium' as const,
+        category: 'core',
+        imageUrl: EXERCISE_IMAGES[3],
+        restTime: 30
+      },
     ],
-    image: EXERCISE_IMAGES[3],
+    coverImage: EXERCISE_IMAGES[3],
   },
   {
     name: 'Lower Body Power',
+    description: 'Build strength and power in your legs and glutes',
     exercises: [
-      { name: 'Squats', reps: 15 },
-      { name: 'Lunges', reps: 12 },
-      { name: 'Calf Raises', reps: 20 },
+      { 
+        name: 'Squats', 
+        description: 'Fundamental lower body exercise',
+        instructions: 'Stand with feet shoulder-width apart, lower your body as if sitting back into a chair',
+        reps: 15,
+        duration: 0,
+        difficulty: 'medium' as const,
+        category: 'strength',
+        imageUrl: EXERCISE_IMAGES[2],
+        restTime: 60
+      },
+      { 
+        name: 'Lunges', 
+        description: 'Single-leg strength exercise',
+        instructions: 'Step forward with one leg, lower your body until both knees are bent at 90 degrees',
+        reps: 12,
+        duration: 0,
+        difficulty: 'medium' as const,
+        category: 'strength',
+        imageUrl: EXERCISE_IMAGES[2],
+        restTime: 60
+      },
+      { 
+        name: 'Calf Raises', 
+        description: 'Strengthen your calf muscles',
+        instructions: 'Stand on the edge of a step, raise your heels up and down',
+        reps: 20,
+        duration: 0,
+        difficulty: 'easy' as const,
+        category: 'strength',
+        imageUrl: EXERCISE_IMAGES[2],
+        restTime: 30
+      },
     ],
-    image: EXERCISE_IMAGES[2],
+    coverImage: EXERCISE_IMAGES[2],
   },
 ];
 
