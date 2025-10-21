@@ -2,7 +2,6 @@ import { useFonts } from 'expo-font';
 import { Stack, SplashScreen } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
-import 'react-native-reanimated';
 import { useAuth } from './context/AuthContext';
 import { useRouter, useSegments } from 'expo-router';
 import LoadingScreen from './components/LoadingScreen';

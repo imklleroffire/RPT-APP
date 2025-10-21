@@ -1,22 +1,13 @@
 import 'react-native-gesture-handler';
-import React from 'react';
 import { LogBox } from 'react-native';
-import { registerRootComponent } from 'expo';
-import { ExpoRoot } from 'expo-router';
 
-// Suppress specific warnings that might be causing issues
+// Suppress specific warnings
 LogBox.ignoreLogs([
   'Warning: Failed prop type',
   'Non-serializable values were found in the navigation state',
 ]);
 
+// This is just for configuration
 export default function App() {
-  return (
-    <ExpoRoot 
-      // @ts-ignore - context exists but TypeScript doesn't recognize it
-      context={require.context('./app')} 
-    />
-  );
+  return null;
 }
-
-registerRootComponent(App); 

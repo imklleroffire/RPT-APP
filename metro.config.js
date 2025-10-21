@@ -1,15 +1,13 @@
-const { getDefaultConfig } = require('@expo/metro-config');
+// Learn more https://docs.expo.io/guides/customizing-metro
+const { getDefaultConfig } = require('expo/metro-config');
 
-const defaultConfig = getDefaultConfig(__dirname);
+const config = getDefaultConfig(__dirname);
 
-// Firebase compatibility fixes for Expo SDK 53
-// This fixes the "tslib" and other .cjs module resolution issues
-defaultConfig.resolver.sourceExts.push('cjs');
-defaultConfig.resolver.assetExts.push('cjs');
-defaultConfig.resolver.unstable_enablePackageExports = false;
+// Firebase and SDK 54 compatibility fixes
+config.resolver.sourceExts = [...config.resolver.sourceExts, 'cjs', 'mjs'];
+config.resolver.assetExts = [...config.resolver.assetExts, 'cjs'];
 
-// Additional resolver configuration for Firebase
-defaultConfig.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
-defaultConfig.resolver.platforms = ['ios', 'android', 'native', 'web'];
+// Additional resolver configuration for better compatibility
+config.resolver.resolverMainFields = ['react-native', 'browser', 'module', 'main'];
 
-module.exports = defaultConfig; 
+module.exports = config;

@@ -1,4 +1,6 @@
-import 'dotenv/config';
+// Import dotenv in a way that works with SDK 54
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 export default {
   expo: {
@@ -6,28 +8,36 @@ export default {
     slug: 'rpt-app',
     version: '1.0.0',
     orientation: 'portrait',
-    icon: './assets/icon.png',
-    userInterfaceStyle: 'light',
+    icon: './assets/images/icon.png',
+    userInterfaceStyle: 'automatic',
+    entryPoint: './index.js',
     splash: {
-      image: './assets/splash.png',
+      image: './assets/images/splash-icon.png',
       resizeMode: 'contain',
       backgroundColor: '#ffffff',
     },
     assetBundlePatterns: ['**/*'],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.rpt.app',
+      bundleIdentifier: 'com.amitkumar.rptapp',
+      buildNumber: '1',
+      jsEngine: 'hermes',
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false
+      }
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: './assets/adaptive-icon.png',
+        foregroundImage: './assets/images/adaptive-icon.png',
         backgroundColor: '#ffffff',
       },
-      package: 'com.rpt.app',
+      package: 'com.amitkumar.rptapp',
+      versionCode: 1,
     },
     web: {
-      favicon: './assets/favicon.png',
+      favicon: './assets/images/favicon.png',
     },
+    plugins: ['expo-router'],
     extra: {
       firebaseApiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
       firebaseAuthDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -36,9 +46,8 @@ export default {
       firebaseMessagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
       firebaseAppId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
       eas: {
-        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
-      },
-    },
-    plugins: ['expo-router'],
-  },
-}; 
+        projectId: "e29930f6-e432-4e09-beb1-4859ca3d3019"
+      }
+    }
+  }
+};
