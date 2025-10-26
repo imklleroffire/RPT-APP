@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
+<<<<<<< HEAD
 import { View, Text, StyleSheet, Animated, Alert } from 'react-native';
+=======
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
+>>>>>>> f5c093816e5096fba21e0e61529f41a0089cd6b9
 import { router } from 'expo-router';
-import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { Input } from '../components/ui/Input';
-import { FONTS, SPACING } from '../constants/theme';
-import { useTheme } from '../context/ThemeContext';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+<<<<<<< HEAD
   const { signIn, error: authError } = useAuth();
   const { colors } = useTheme();
   const glowAnim = new Animated.Value(0);
@@ -71,14 +70,54 @@ export default function LoginScreen() {
     // Validate form first
     if (!validateForm()) {
       return; // Stop here if validation fails
+=======
+
+  const handleSignIn = async () => {
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+>>>>>>> f5c093816e5096fba21e0e61529f41a0089cd6b9
     }
 
     try {
       setLoading(true);
+<<<<<<< HEAD
       await signIn(email.trim(), password);
     } catch (error) {
       console.error('Sign in error:', error);
       // Error is already handled in AuthContext, but we can add additional handling here
+=======
+      setError(null);
+      
+      // Import Firebase auth dynamically to avoid initialization issues
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const { auth } = await import('../config/firebase');
+      
+      console.log('Attempting to sign in with:', email);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      console.log('Sign in successful:', userCredential.user.uid);
+      Alert.alert('Success', 'Logged in successfully!');
+      
+      // Navigate to home or dashboard
+      router.replace('/home');
+      
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      let errorMessage = 'Failed to sign in';
+      
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+      
+      setError(errorMessage);
+>>>>>>> f5c093816e5096fba21e0e61529f41a0089cd6b9
     } finally {
       setLoading(false);
     }
@@ -101,6 +140,7 @@ export default function LoginScreen() {
   });
 
   return (
+<<<<<<< HEAD
     <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
       <Animated.View
         style={[
@@ -117,8 +157,15 @@ export default function LoginScreen() {
       <Card variant="glow" style={styles.card}>
         <Text style={[styles.title, { color: colors.text.primary }]}>Welcome Back</Text>
         <Text style={[styles.subtitle, { color: colors.text.secondary }]}>Sign in to continue</Text>
+=======
+    <View style={styles.container}>
+      <View style={styles.card}>
+        <Text style={styles.title}>Welcome Back</Text>
+        <Text style={styles.subtitle}>Sign in to continue</Text>
+>>>>>>> f5c093816e5096fba21e0e61529f41a0089cd6b9
 
-        <Input
+        <TextInput
+          style={styles.input}
           placeholder="Email"
           value={email}
           onChangeText={(text) => {
@@ -127,10 +174,11 @@ export default function LoginScreen() {
           }}
           autoCapitalize="none"
           keyboardType="email-address"
-          style={styles.input}
+          editable={!loading}
         />
 
-        <Input
+        <TextInput
+          style={styles.input}
           placeholder="Password"
           value={password}
           onChangeText={(text) => {
@@ -138,9 +186,10 @@ export default function LoginScreen() {
             setError(null); // Clear error when user types
           }}
           secureTextEntry
-          style={styles.input}
+          editable={!loading}
         />
 
+<<<<<<< HEAD
         {(error || authError) && (
           <View style={[styles.errorContainer, { backgroundColor: colors.error + '20' }]}>
             <Text style={[styles.errorText, { color: colors.error }]}>
@@ -155,9 +204,23 @@ export default function LoginScreen() {
           variant="neon"
           size="large"
           style={styles.button}
-          disabled={loading}
-        />
+=======
+        {error && (
+          <Text style={styles.error}>{error}</Text>
+        )}
 
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleSignIn}
+>>>>>>> f5c093816e5096fba21e0e61529f41a0089cd6b9
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? 'Signing In...' : 'Sign In'}
+          </Text>
+        </TouchableOpacity>
+
+<<<<<<< HEAD
         <Button
           title="Don't have an account? Sign up"
           onPress={handleSignUp}
@@ -174,6 +237,18 @@ export default function LoginScreen() {
           style={styles.testButton}
         />
       </Card>
+=======
+        <TouchableOpacity
+          onPress={() => router.push('/register')}
+          style={styles.registerLink}
+          disabled={loading}
+        >
+          <Text style={styles.registerText}>
+            Don't have an account? Sign up
+          </Text>
+        </TouchableOpacity>
+      </View>
+>>>>>>> f5c093816e5096fba21e0e61529f41a0089cd6b9
     </View>
   );
 }
@@ -181,8 +256,9 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: SPACING.xl,
+    padding: 24,
     justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
   },
   glowContainer: {
     position: 'absolute',
@@ -205,26 +281,52 @@ const styles = StyleSheet.create({
     opacity: 0.1,
   },
   card: {
-    padding: SPACING.xl,
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   title: {
-    fontFamily: FONTS.bold,
-    fontSize: FONTS.sizes.xl,
+    fontSize: 28,
+    fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: 8,
+    color: '#333',
   },
   subtitle: {
-    fontFamily: FONTS.regular,
-    fontSize: FONTS.sizes.md,
+    fontSize: 16,
     textAlign: 'center',
-    marginBottom: SPACING.xl,
+    marginBottom: 32,
+    color: '#666',
   },
   input: {
-    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    fontSize: 16,
   },
   button: {
-    marginTop: SPACING.md,
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 16,
   },
+  buttonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  buttonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+<<<<<<< HEAD
   errorContainer: {
     padding: SPACING.sm,
     borderRadius: 8,
@@ -240,5 +342,20 @@ const styles = StyleSheet.create({
   },
   testButton: {
     marginTop: SPACING.sm,
+=======
+  error: {
+    color: '#FF3B30',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontSize: 14,
+  },
+  registerLink: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  registerText: {
+    fontSize: 16,
+    color: '#007AFF',
+>>>>>>> f5c093816e5096fba21e0e61529f41a0089cd6b9
   },
 }); 

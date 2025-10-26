@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -36,3 +37,10 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 }); 
+=======
+import { Redirect } from 'expo-router';
+
+export default function Index() {
+  return <Redirect href="/login" />;
+}
+>>>>>>> f5c093816e5096fba21e0e61529f41a0089cd6b9
