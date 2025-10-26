@@ -9,6 +9,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { View } from 'react-native';
+import 'text-encoding';
 
 // Prevent the splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();

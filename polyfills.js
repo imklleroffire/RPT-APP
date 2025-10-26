@@ -1,37 +1,16 @@
-// Handle base64 encoding/decoding for React Native
-if (typeof global.btoa !== 'function') {
-  global.btoa = function (input = '') {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-    let output = '';
-    const str = input;
-    for (let block = 0, charCode, i = 0, map = chars;
-      str.charAt(i | 0) || (map = '=', i % 1);
-      output += map.charAt(63 & block >> 8 - i % 1 * 8)) {
-      charCode = str.charCodeAt(i += 3/4);
-      if (charCode > 0xFF) {
-        throw new Error("'btoa' failed: The string to be encoded contains characters outside of the Latin1 range.");
-      }
-      block = block << 8 | charCode;
-    }
-    return output;
+// polyfills.js
+// Only needed if you require atob/btoa for base64 encoding
+
+if (typeof global.atob === 'undefined') {
+  global.atob = (input) => {
+    return Buffer.from(input, 'base64').toString('binary');
   };
 }
 
-if (typeof global.atob !== 'function') {
-  global.atob = function (input = '') {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-    let str = input.replace(/=+$/, '');
-    let output = '';
-    if (str.length % 4 === 1) {
-      throw new Error("'atob' failed: The string to be decoded is not correctly encoded.");
-    }
-    for (let bc = 0, bs = 0, buffer, i = 0;
-      buffer = str.charAt(i++);
-      ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer,
-        bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0
-    ) {
-      buffer = chars.indexOf(buffer);
-    }
-    return output;
+if (typeof global.btoa === 'undefined') {
+  global.btoa = (input) => {
+    return Buffer.from(input, 'binary').toString('base64');
   };
 }
+
+console.log('✅ atob/btoa polyfills loaded');

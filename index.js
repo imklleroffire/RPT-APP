@@ -1,46 +1,51 @@
-// --- CRITICAL: Polyfills MUST be loaded FIRST ---
-// Order matters! These must load before any Firebase or other library code
-console.log('ENTRY START', {
-  URL: typeof URL !== 'undefined',
-  TextDecoder: typeof TextDecoder !== 'undefined',
-});
+// index.js
+// ==========================================
+// CRITICAL: Setup polyfills BEFORE any imports
+// ==========================================
 
-// 1. Crypto polyfill (FIRST - required by Firebase)
+// 1. TextDecoder/TextEncoder - MUST be first
+const FastTextEncoding = require('fast-text-encoding');
+
+global.TextDecoder = class TextDecoder {
+  constructor(encoding = 'utf-8', options = {}) {
+    this._decoder = new FastTextEncoding.TextDecoder(encoding, options);
+  }
+  
+  decode(input, options) {
+    return this._decoder.decode(input, options);
+  }
+  
+  get encoding() { return this._decoder.encoding; }
+  get fatal() { return this._decoder.fatal; }
+  get ignoreBOM() { return this._decoder.ignoreBOM; }
+};
+
+global.TextEncoder = class TextEncoder {
+  constructor() {
+    this._encoder = new FastTextEncoding.TextEncoder();
+  }
+  
+  encode(input) {
+    return this._encoder.encode(input);
+  }
+  
+  get encoding() { return this._encoder.encoding; }
+};
+
+// 2. Load other polyfills
+require('./globals.js');
+require('./url-polyfill.js');
+
+// 3. Crypto polyfill (for Firebase)
 require('react-native-get-random-values');
 
-// 2. TextEncoder/TextDecoder polyfill
-if (typeof global.TextEncoder === 'undefined' || typeof global.TextDecoder === 'undefined') {
-  const { TextEncoder, TextDecoder } = require('fastestsmallesttextencoderdecoder');
-  global.TextEncoder = TextEncoder;
-  global.TextDecoder = TextDecoder;
+// 4. atob/btoa
+if (typeof global.atob === 'undefined') {
+  global.atob = (input) => Buffer.from(input, 'base64').toString('binary');
+  global.btoa = (input) => Buffer.from(input, 'binary').toString('base64');
 }
 
-// 3. URL polyfill
-require('react-native-url-polyfill/auto');
+console.log('✅ All polyfills loaded successfully');
 
-// 4. Ensure atob/btoa are available (from polyfills.js)
-require('./polyfills.js');
-
-// 5. Verify polyfills are loaded
-console.log('✅ Polyfills loaded:', {
-  TextDecoder: typeof global.TextDecoder !== 'undefined',
-  TextEncoder: typeof global.TextEncoder !== 'undefined',
-  URL: typeof global.URL !== 'undefined',
-  atob: typeof global.atob !== 'undefined',
-  btoa: typeof global.btoa !== 'undefined',
-  crypto: typeof global.crypto !== 'undefined',
-  getRandomValues: typeof global.crypto?.getRandomValues !== 'undefined',
-});
-
-// Test TextDecoder works
-try {
-  const testDecoder = new global.TextDecoder();
-  const testData = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
-  const result = testDecoder.decode(testData);
-  console.log('✅ TextDecoder test passed:', result);
-} catch (e) {
-  console.error('❌ TextDecoder test failed:', e);
-}
-
-// Finally, start the app
+// 5. Start Expo Router (not registerRootComponent for Expo Router apps!)
 require('expo-router/entry');
