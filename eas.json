@@ -1,0 +1,47 @@
+{
+  "cli": {
+    "version": ">= 16.24.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {
+      "autoIncrement": true
+    },
+    "sdk53": {
+      "channel": "sdk53",
+      "distribution": "store",
+      "developmentClient": false,
+      "ios": {
+        "simulator": false
+      }
+    },
+    "sdk54": {
+      "channel": "sdk54",
+      "distribution": "store",
+      "developmentClient": false,
+      "ios": {
+        "simulator": false
+      }
+    },
+    "internal53": {
+      "channel": "sdk53",
+      "distribution": "internal",
+      "developmentClient": false,
+      "ios": {
+        "simulator": false
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {}
+    }
+  }
+}
